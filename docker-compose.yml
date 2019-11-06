@@ -1,0 +1,9 @@
+version: '3.7'
+services:
+  orientdb:
+    image: orientdb
+    ports:
+    - 2480:2480
+    - 2424:2424
+    environment:
+      ORIENTDB_ROOT_PASSWORD: root

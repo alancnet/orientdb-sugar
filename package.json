@@ -1,0 +1,14 @@
+{
+  "name": "orient-sugar",
+  "version": "1.0.0",
+  "main": "index.js",
+  "license": "MIT",
+  "dependencies": {
+    "gefer": "^1.0.1",
+    "generator-extensions": "^1.0.3",
+    "lodash": "^4.17.15"
+  },
+  "peerDependencies": {
+    "orientjs": "^3.0.8"
+  }
+}
