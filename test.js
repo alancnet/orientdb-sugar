@@ -10,9 +10,22 @@ async function main() {
     })
     const test = client.db('test')
 
-    const v1 = await test.upsert('Actor', {name: 'Tom Hanks'})
-    const v2 = await test.upsert('Movie', {name: 'Forest Gump'})
-    const e = await test.upsertEdge('ActedIn', v1, v2)
+    // const v1 = await test.upsertVertex('Actor', {name: 'Tom Hanks'})
+    // const v2 = await test.upsertVertex('Movie', {name: 'Forest Gump'})
+    // const e = await test.upsertEdge('ActedIn', v1, v2)
+
+    console.log(test.vertex('Actor').traverse().out('ActedIn').out('FromStudio').outE('something')
+    .where({
+        $and: [
+            {age: 54},
+            {blue: 677}
+        ],
+        $or: [
+            {age: 54, banana: 'hi'},
+            {blue: 677}
+        ]
+    })
+    .toString())
 
     await client.close()
 }
