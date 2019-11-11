@@ -456,22 +456,22 @@ class VertexTraversal extends Traversal {
         return this
     }
     out(edgeName) {
-        return new VertexTraversal(this.session, this, `out('${edgeName}')`, true)
+        return new VertexTraversal(this.session, this, `out('${edgeName.name || edgeName}')`, true)
     }
     outE(edgeName) {
-        return new EdgeTraversal(this.session, this, `outE('${edgeName}')`, true)
+        return new EdgeTraversal(this.session, this, `outE('${edgeName.name || edgeName}')`, true)
     }
     in(edgeName) {
-        return new VertexTraversal(this.session, this, `in('${edgeName}')`, true)
+        return new VertexTraversal(this.session, this, `in('${edgeName.name || edgeName}')`, true)
     }
     inE(edgeName) {
-        return new EdgeTraversal(this.session, this, `inE('${edgeName}')`, true)
+        return new EdgeTraversal(this.session, this, `inE('${edgeName.name || edgeName}')`, true)
     }
     both(edgeName) {
-        return new VertexTraversal(this.session, this, `both('${edgeName}')`, true)
+        return new VertexTraversal(this.session, this, `both('${edgeName.name || edgeName}')`, true)
     }
     bothE(edgeName) {
-        return new EdgeTraversal(this.session, this, `bothE('${edgeName}')`, true)
+        return new EdgeTraversal(this.session, this, `bothE('${edgeName.name || edgeName}')`, true)
     }
     where(criteria) {
         return new VertexTraversal(this.session, this, `select from (${this.toString()}) WHERE ${objectCriteria(criteria)}`, false)
