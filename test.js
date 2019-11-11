@@ -7,7 +7,8 @@ async function main() {
         database: 'test',
         username: 'root',
         password: 'root',
-        manageSchema: true
+        manageSchema: true,
+        log: console.log
     })
     const test = client.db('test')
 
@@ -32,12 +33,20 @@ async function main() {
     .property('name', 'string')
     .index('name', 'fulltext engine lucene')
 
-    await test.vertex('Something2')
+    const v = await test.vertex('Something2')
     .property('name', 'string')
     .index('name', 'fulltext engine lucene')
     .property('id', 'integer')
     .index('id', 'unique')
     .upsert({id: 123}, {name: 'foobar'})
+
+    test.vertex('SomethingElse')
+
+    test.edge('Touches')
+
+    const v2 = await test.vertex('SomethingElse').upsert({name: 'hi'})
+
+    await test.edge('Touches').upsert(v, v2)
 
     for await (let actor of test.vertex('Actor').traverse().where({name: {$ne: null}})) {
         console.log(actor)

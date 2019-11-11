@@ -94,6 +94,7 @@ class Client {
         return new Database(session, {
             ...options,
             manageSchema: this.options.manageSchema,
+            log: this.options.log,
             schema: {}
         })
     }
@@ -146,11 +147,11 @@ class Database {
     class(name) {
         return new Class(this.session, name, this.options)
     }
-    vertex(name) {
-        return new Vertex(this.session, name, this.options)
+    vertex(name, base) {
+        return new Vertex(this.session, name, this.options).extends(base)
     }
-    edge(name) {
-        return new Edge(this.session, name, this.options)
+    edge(name, base) {
+        return new Edge(this.session, name, this.options).extends(base)
     }
 }
 
@@ -165,6 +166,10 @@ class Class {
         }
     }
 
+    log(...args) {
+        if (this.options.log) this.options.log(...args)
+    }
+
     /**
      * Creates a new class in the schema.
      * @param {string} base Optional base class
@@ -175,7 +180,7 @@ class Class {
                 this.options.schema[this.name] = {
                     promise: this.session.then(async s => {
                         const sql = `create class ${this.name} if not exists${base ? ` extends ${base}`:''}`
-                        console.log(sql)
+                        this.log(sql)
                         await s.command(sql)
                         return s
                     })
@@ -197,7 +202,7 @@ class Class {
             this.extends()
             this._schema.promise = this._schema.promise.then(async s => {
                 const sql = `create property ${this.name}.${name} if not exists ${type}`
-                console.log(sql)
+                this.log(sql)
                 await s.command(sql)
                 return s
             })
@@ -219,7 +224,7 @@ class Class {
             const indexName = name || `${this.name}_${type.split(' ').join('_')}_${properties.join('_')}`
             this._schema.promise = this._schema.promise.then(async s => {
                 const sql = `create index ${indexName} if not exists on ${this.name} (${properties.join(', ')}) ${type}`
-                console.log(sql)
+                this.log(sql)
                 await s.command(sql)
                 return s
             })
@@ -265,9 +270,9 @@ class Class {
     traverse(record) {
         const rids = toRidArray(record)
         if (rids) {
-            return new VertexTraversal(this.session, null, `select from [${rids.join(', ')}]`)
+            return new Traversal(this.session, null, `select from [${rids.join(', ')}]`, false, this.options)
         } else {
-            return new VertexTraversal(this.session, null, `select from ${this.name}`)
+            return new Traversal(this.session, null, `select from ${this.name}`, false, this.options)
         }
     }
 }
@@ -317,9 +322,9 @@ class Edge extends Class {
     traverse(record) {
         const rids = toRidArray(record)
         if (rids) {
-            return new EdgeTraversal(this.session, null, `select from [${rids.join(', ')}]`)
+            return new EdgeTraversal(this.session, null, `select from [${rids.join(', ')}]`, false, this.options)
         } else {
-            return new EdgeTraversal(this.session, null, `select from ${this.name}`)
+            return new EdgeTraversal(this.session, null, `select from ${this.name}`, false, this.options)
         }
     }
 }
@@ -367,20 +372,24 @@ class Vertex extends Class {
     traverse(record) {
         const rids = toRidArray(record)
         if (rids) {
-            return new VertexTraversal(this.session, null, `select from [${rids.join(', ')}]`)
+            return new VertexTraversal(this.session, null, `select from [${rids.join(', ')}]`, false, this.options)
         } else {
-            return new VertexTraversal(this.session, null, `select from ${this.name}`)
+            return new VertexTraversal(this.session, null, `select from ${this.name}`, false, this.options)
         }
     }
 }
 
 
 class Traversal {
-    constructor(session, parent, expression, chainable = false) {
+    constructor(session, parent, expression, chainable = false, options) {
         this.session = session
         this.parent = parent
         this.expression = expression
         this.chainable = chainable
+        this.options = options || parent.options
+    }
+    log(...args) {
+        if (this.options.log) this.options.log(...args)
     }
     toString(expr) {
         if (expr) {
@@ -400,7 +409,7 @@ class Traversal {
     async *[Symbol.asyncIterator]() {
         const s = await this.session
         const query = this.toString()
-        console.log(query)
+        this.log(query)
         yield* s.query(query)
     }
     next() {
