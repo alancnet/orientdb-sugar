@@ -67,6 +67,7 @@ class Client {
      * @param {string} options.database Database name
      * @param {string} options.username Username
      * @param {string} options.password Password
+     * @param {boolean} options.manageSchema Enables the client to create classes, properties, and indices. 
      */
     constructor(options) {
         this.client = OrientDBClient.connect({
@@ -90,7 +91,11 @@ class Client {
             password: options.password || this.options.password
         }))
 
-        return new Database(session, options)
+        return new Database(session, {
+            ...options,
+            manageSchema: this.options.manageSchema,
+            schema: {}
+        })
     }
     async close() {
         return (await this.client).close()
@@ -112,7 +117,7 @@ class Database {
         yield* subject()
     }
     async insert(name, record) {
-        return await new Class(this.session, name).insert(record)
+        return await new Class(this.session, name, this.options).insert(record)
     }
     async insertVertex(name, data) {
         return await this.vertex(name).insert(data)
@@ -121,16 +126,16 @@ class Database {
         return await this.edge(name).insert(from, to, data)
     }
     async get(name, query) {
-        return await new Class(this.session, name).get(query)
+        return await new Class(this.session, name, this.options).get(query)
     }
     async* select(name, query) {
-        yield* new Class(this.session, name).select(query)
+        yield* new Class(this.session, name, this.options).select(query)
     }
     async update(name, record, data) {
-        return await new Class(this.session, name).update(record, data)
+        return await new Class(this.session, name, this.options).update(record, data)
     }
     async upsert(name, query, data = {}) {
-        return await new Class(this.session, name).upsert(query, data)
+        return await new Class(this.session, name, this.options).upsert(query, data)
     }
     async upsertVertex(name, query, data) {
         return await this.vertex(name).upsert(query, data)
@@ -139,20 +144,88 @@ class Database {
         return await this.edge(name).upsert(from, to, data)
     }
     class(name) {
-        return new Class(this.session, name)
+        return new Class(this.session, name, this.options)
     }
     vertex(name) {
-        return new Vertex(this.session, name)
+        return new Vertex(this.session, name, this.options)
     }
     edge(name) {
-        return new Edge(this.session, name)
+        return new Edge(this.session, name, this.options)
     }
 }
 
 class Class {
-    constructor(session, name) {
-        this.session = session
+    constructor(session, name, options) {
         this.name = name
+        this.options = options
+        if (this.options.schema[this.name]) {
+            this.session = this.options.schema[this.name].promise.then(session)
+        } else {
+            this.session = session
+        }
+    }
+
+    /**
+     * Creates a new class in the schema.
+     * @param {string} base Optional base class
+     */
+    extends(base) {
+        if (this.options.manageSchema) {
+            if (!this.options.schema[this.name]) {
+                this.options.schema[this.name] = {
+                    promise: this.session.then(async s => {
+                        const sql = `create class ${this.name} if not exists${base ? ` extends ${base}`:''}`
+                        console.log(sql)
+                        await s.command(sql)
+                        return s
+                    })
+                }
+            }
+            this._schema = this.options.schema[this.name]
+            this.session = this._schema.promise
+        }
+        return this
+    }
+
+    /**
+     * Creates a new property in the schema. It requires that the class for the property already exist on the database.
+     * @param {string} name Defines the logical name for the property.
+     * @param {string} type Defines the property data type.
+     */
+    property(name, type) {
+        if (this.options.manageSchema) {
+            this.extends()
+            this._schema.promise = this._schema.promise.then(async s => {
+                const sql = `create property ${this.name}.${name} if not exists ${type}`
+                console.log(sql)
+                await s.command(sql)
+                return s
+            })
+            this.session = this._schema.promise
+        }
+        return this
+    }
+
+    /**
+     * Ensures an index exists. If the index already exists, this will not overwrite or reconfigure it.
+     * @param {string[]} properties Array of properties to include in the index
+     * @param {string} type Defines the index type that you want to use.
+     * @param {string} name Optional. Specify the name of the index.
+     */
+    index(properties, type, name) {
+        if (this.options.manageSchema) {
+            if (!Array.isArray(properties)) properties = [properties]
+            this.extends()
+            const indexName = name || `${this.name}_${type.split(' ').join('_')}_${properties.join('_')}`
+            this._schema.promise = this._schema.promise.then(async s => {
+                const sql = `create index ${indexName} if not exists on ${this.name} (${properties.join(', ')}) ${type}`
+                console.log(sql)
+                await s.command(sql)
+                return s
+            })
+            this.session = this._schema.promise
+        }
+        return this
     }
 
     async insert(data) {
@@ -200,9 +273,22 @@ class Class {
 }
 
 class Edge extends Class {
-    constructor(session, name) {
-        super(session, name)
+    constructor(session, name, options) {
+        super(session, name, options)
     }
+    extends(base) {
+        super.extends(base || 'E')
+        return this
+    }
+    property(name, type) {
+        super.property(name, type)
+        return this
+    }
+    index(properties, type, name) {
+        super.index(properties, type, name)
+        return this
+    }
+
     async insert(from, to, data = {}) {
         const s = await this.session
         return await s.create('EDGE', this.name).from(from).to(to).set(data).one()
@@ -239,9 +325,22 @@ class Edge extends Class {
 }
 
 class Vertex extends Class {
-    constructor(session, name) {
-        super(session, name)
+    constructor(session, name, options) {
+        super(session, name, options)
     }
+    extends(base) {
+        super.extends(base || 'V')
+        return this
+    }
+    property(name, type) {
+        super.property(name, type)
+        return this
+    }
+    index(properties, type, name) {
+        super.index(properties, type, name)
+        return this
+    }
+
     async insert(data) {
         const s = await this.session
         return await s.create('VERTEX', this.name).set(data).one()

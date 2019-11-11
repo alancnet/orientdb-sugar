@@ -6,7 +6,8 @@ async function main() {
         port: 2424,
         database: 'test',
         username: 'root',
-        password: 'root'
+        password: 'root',
+        manageSchema: true
     })
     const test = client.db('test')
 
@@ -27,8 +28,22 @@ async function main() {
     // })
     // .toString())
 
+    const Actor = test.vertex('Actor')
+    .property('name', 'string')
+    .index('name', 'fulltext engine lucene')
+
+    await test.vertex('Something2')
+    .property('name', 'string')
+    .index('name', 'fulltext engine lucene')
+    .property('id', 'integer')
+    .index('id', 'unique')
+    .upsert({id: 123}, {name: 'foobar'})
+
     for await (let actor of test.vertex('Actor').traverse().where({name: {$ne: null}})) {
         console.log(actor)
+    }
+    for await (let record of test.vertex('Something2').select()) {
+        console.log(record)
     }
 
     await client.close()
