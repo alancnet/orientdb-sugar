@@ -396,7 +396,7 @@ class Traversal {
             if (this.chainable) {
                 return this.parent.toString(`${this.expression}.${expr}`)
             } else {
-                return `select ${expr} from (${this.expression})`
+                return `select expand(${expr}) from (${this.expression})`
             }
         } else {
             if (this.chainable) {
