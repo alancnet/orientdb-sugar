@@ -412,6 +412,13 @@ class Traversal {
         this.log(query)
         yield* s.query(query)
     }
+    async toArray() {
+        let ret = []
+        for await (let record of this) {
+            ret.push(record)
+        }
+        return ret
+    }
     next() {
         return this
     }

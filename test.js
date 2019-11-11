@@ -55,6 +55,7 @@ async function main() {
         console.log(record)
     }
 
+    console.log(await test.vertex('Actor').traverse().toArray())
     await client.close()
 }
 
