@@ -407,10 +407,15 @@ class Traversal {
         }
     }
     async *[Symbol.asyncIterator]() {
+        const subject = gefer.subject()
         const s = await this.session
         const query = this.toString()
         this.log(query)
-        yield* s.query(query)
+        s.query(query)
+            .on('data', subject.next)
+            .on('error', subject.error)
+            .on('end', subject.return)
+        yield* subject()
     }
     async toArray() {
         let ret = []
