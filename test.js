@@ -14,18 +14,22 @@ async function main() {
     // const v2 = await test.upsertVertex('Movie', {name: 'Forest Gump'})
     // const e = await test.upsertEdge('ActedIn', v1, v2)
 
-    console.log(test.vertex('Actor').traverse().out('ActedIn').out('FromStudio').outE('something')
-    .where({
-        $and: [
-            {age: 54},
-            {blue: 677}
-        ],
-        $or: [
-            {age: 54, banana: 'hi'},
-            {blue: 677}
-        ]
-    })
-    .toString())
+    // console.log(test.vertex('Actor').traverse().out('ActedIn').out('FromStudio').outE('something')
+    // .where({
+    //     $and: [
+    //         {age: 54},
+    //         {blue: 677}
+    //     ],
+    //     $or: [
+    //         {age: 54, banana: 'hi'},
+    //         {blue: 677}
+    //     ]
+    // })
+    // .toString())
+
+    for await (let actor of test.vertex('Actor').traverse().where({name: {$ne: null}})) {
+        console.log(actor)
+    }
 
     await client.close()
 }

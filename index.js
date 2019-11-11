@@ -47,10 +47,10 @@ const objectCriteria = (obj) => {
     } else {
         return parens(Object.entries(obj).map(([field, value]) => {
             if (value && Object.keys(value).some(x => x.startsWith('$'))) {
-                if (!key.startsWith('$')) throw new Error('Cannot mix directives with fields')
-                return Object.entries(obj).map(([key, value]) =>
-                    ops[key](field, value)
-                )
+                return parens(Object.entries(value).map(([key, value]) => {
+                    if (!key.startsWith('$')) throw new Error('Cannot mix directives with fields')
+                    return ops[key](field, value)
+                }), ' AND ')
             } else {
                 return ops.$eq(field, value)
             }
@@ -73,27 +73,43 @@ class Client {
             host: options.host,
             port: options.port
         })
-        this.session = this.client.then(client => client.session({
-            name: options.database || options.name,
-            username: options.username,
-            password: options.password
-        }))
+        this.options = options
     }
-    db(name) {
-        return new Database(this.session)
+    /**
+     * 
+     * @param {string} name Database name, defaults to database specified in client options.
+     * @param {object} options 
+     * @param {string} options.username Username
+     * @param {string} options.password Password
+     */
+    db(name, options = {}) {
+        if (!name) name = name || options.database || options.name
+        const session = this.client.then(client => client.session({
+            name,
+            username: options.username || this.options.username,
+            password: options.password || this.options.password
+        }))
+
+        return new Database(session, options)
     }
     async close() {
-        await this.session
         return (await this.client).close()
     }
 }
 
 class Database {
-    constructor(session) {
+    constructor(session, options) {
         this.session = session
+        this.options = options
     }
-    class(name) {
-        return new Class(this.session, name)
+    async * query(queryText, options) {
+        const subject = gefer.subject()
+        const s = await this.session
+        s.query(queryText, options)
+            .on('data', subject.next)
+            .on('error', subject.error)
+            .on('end', subject.return)
+        yield* subject()
     }
     async insert(name, record) {
         return await new Class(this.session, name).insert(record)
@@ -122,6 +138,9 @@ class Database {
     async upsertEdge(name, from, to, data = {}) {
         return await this.edge(name).upsert(from, to, data)
     }
+    class(name) {
+        return new Class(this.session, name)
+    }
     vertex(name) {
         return new Vertex(this.session, name)
     }
@@ -146,16 +165,6 @@ class Class {
         return await s.select().from(this.name).where(query).one()
     }
 
-    async * select(query) {
-        const subject = gefer.subject()
-        const s = await this.session
-        s.select().from(this.name).where(query)
-        .on('data', subject.next)
-        .on('error', subject.error)
-        .on('end', subject.return)
-        yield* subject
-    }
-
     async update(record, data) {
         const s = await this.session
         return await s.update(record['@rid'] || record).set(data).one()
@@ -174,6 +183,19 @@ class Class {
             record = await s.insert().into(this.name).set({...query, ...data}).one()
         }
         return record
+    }
+
+    select(query) {
+        return query ? this.traverse().where(query) : this.traverse()
+    }
+
+    traverse(record) {
+        const rids = toRidArray(record)
+        if (rids) {
+            return new VertexTraversal(this.session, null, `select from [${rids.join(', ')}]`)
+        } else {
+            return new VertexTraversal(this.session, null, `select from ${this.name}`)
+        }
     }
 }
 
@@ -201,12 +223,17 @@ class Edge extends Class {
         }
         return record
     }
+
+    select(query) {
+        return query ? this.traverse().where(query) : this.traverse()
+    }
+
     traverse(record) {
         const rids = toRidArray(record)
         if (rids) {
-            return new EdgeTraversal(null, `select from [${rids.join(', ')}]`)
+            return new EdgeTraversal(this.session, null, `select from [${rids.join(', ')}]`)
         } else {
-            return new EdgeTraversal(null, `select from ${this.name}`)
+            return new EdgeTraversal(this.session, null, `select from ${this.name}`)
         }
     }
 }
@@ -233,19 +260,25 @@ class Vertex extends Class {
         }
         return record
     }
+
+    select(query) {
+        return query ? this.traverse().where(query) : this.traverse()
+    }
+
     traverse(record) {
         const rids = toRidArray(record)
         if (rids) {
-            return new VertexTraversal(null, `select from [${rids.join(', ')}]`)
+            return new VertexTraversal(this.session, null, `select from [${rids.join(', ')}]`)
         } else {
-            return new VertexTraversal(null, `select from ${this.name}`)
+            return new VertexTraversal(this.session, null, `select from ${this.name}`)
         }
     }
 }
 
 
 class Traversal {
-    constructor(parent, expression, chainable = false) {
+    constructor(session, parent, expression, chainable = false) {
+        this.session = session
         this.parent = parent
         this.expression = expression
         this.chainable = chainable
@@ -265,44 +298,68 @@ class Traversal {
             }
         }
     }
+    async *[Symbol.asyncIterator]() {
+        const s = await this.session
+        const query = this.toString()
+        console.log(query)
+        yield* s.query(query)
+    }
+    next() {
+        return this
+    }
+    limit() {
+        return this.next()
+    }
+    where(criteria) {
+        return new Traversal(this.session, this, `${this.toString()} WHERE ${objectCriteria(criteria)}`, false)
+    }
+    slice(start, count) {
+        return new Traversal(this.session, this `${this.toString()} SKIP ${start} LIMIT ${count}`, false)
+    }
 }
 
 class EdgeTraversal extends Traversal {
+    next() {
+        return this
+    }
     outV() {
-        return new VertexTraversal(this, `outV()`, true)
+        return new VertexTraversal(this.session, this, `outV()`, true)
     }
     inV() {
-        return new VertexTraversal(this, `inV()`, true)
+        return new VertexTraversal(this.session, this, `inV()`, true)
     }
     bothV() {
-        return new VertexTraversal(this, `bothV()`, true)
+        return new VertexTraversal(this.session, this, `bothV()`, true)
     }
     where(criteria) {
-        return new EdgeTraversal(this, `${this.toString()} WHERE ${objectCriteria(criteria)}`, false)
+        return new EdgeTraversal(this.session, this, `${this.toString()} WHERE ${objectCriteria(criteria)}`, false)
     }
 }
 
 class VertexTraversal extends Traversal {
+    next() {
+        return this
+    }
     out(edgeName) {
-        return new VertexTraversal(this, `out('${edgeName}')`, true)
+        return new VertexTraversal(this.session, this, `out('${edgeName}')`, true)
     }
     outE(edgeName) {
-        return new EdgeTraversal(this, `outE('${edgeName}')`, true)
+        return new EdgeTraversal(this.session, this, `outE('${edgeName}')`, true)
     }
     in(edgeName) {
-        return new VertexTraversal(this, `in('${edgeName}')`, true)
+        return new VertexTraversal(this.session, this, `in('${edgeName}')`, true)
     }
     inE(edgeName) {
-        return new EdgeTraversal(this, `inE('${edgeName}')`, true)
+        return new EdgeTraversal(this.session, this, `inE('${edgeName}')`, true)
     }
     both(edgeName) {
-        return new VertexTraversal(this, `both('${edgeName}')`, true)
+        return new VertexTraversal(this.session, this, `both('${edgeName}')`, true)
     }
     bothE(edgeName) {
-        return new EdgeTraversal(this, `bothE('${edgeName}')`, true)
+        return new EdgeTraversal(this.session, this, `bothE('${edgeName}')`, true)
     }
     where(criteria) {
-        return new VertexTraversal(this, `${this.toString()} WHERE ${objectCriteria(criteria)}`, false)
+        return new VertexTraversal(this.session, this, `${this.toString()} WHERE ${objectCriteria(criteria)}`, false)
     }
 }
 
