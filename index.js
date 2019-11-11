@@ -419,6 +419,9 @@ class Traversal {
         }
         return ret
     }
+    async one() {
+        return (await this.toArray())[0]
+    }
     next() {
         return this
     }
