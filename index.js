@@ -28,14 +28,14 @@ const groups = {
     $or: (v) => parens(v.map(objectCriteria), ' OR ')
 }
 const ops = {
-    $eq: (f, v) => `$current.\`${f}\` = ${JSON.stringify(v)}`,
-    $ne: (f, v) => `$current.\`${f}\` != ${JSON.stringify(v)}`,
-    $gt: (f, v) => `$current.\`${f}\` > ${JSON.stringify(v)}`,
-    $gte: (f, v) => `$current.\`${f}\` >= ${JSON.stringify(v)}`,
-    $lt: (f, v) => `$current.\`${f}\` < ${JSON.stringify(v)}`,
-    $lte: (f, v) => `$current.\`${f}\` <= ${JSON.stringify(v)}`,
-    $in: (f, v) => `$current.\`${f}\` in ${JSON.stringify(v)}`,
-    $nin: (f, v) => `$current.\`${f}\` not in ${JSON.stringify(v)}`
+    $eq: (f, v) => `\`${f}\` = ${JSON.stringify(v)}`,
+    $ne: (f, v) => `\`${f}\` != ${JSON.stringify(v)}`,
+    $gt: (f, v) => `\`${f}\` > ${JSON.stringify(v)}`,
+    $gte: (f, v) => `\`${f}\` >= ${JSON.stringify(v)}`,
+    $lt: (f, v) => `\`${f}\` < ${JSON.stringify(v)}`,
+    $lte: (f, v) => `\`${f}\` <= ${JSON.stringify(v)}`,
+    $in: (f, v) => `\`${f}\` in ${JSON.stringify(v)}`,
+    $nin: (f, v) => `\`${f}\` not in ${JSON.stringify(v)}`
 }
 
 const objectCriteria = (obj) => {
@@ -426,7 +426,7 @@ class Traversal {
         return this.next()
     }
     where(criteria) {
-        return new Traversal(this.session, this, `${this.toString()} WHERE ${objectCriteria(criteria)}`, false)
+        return new Traversal(this.session, this, `select from (${this.toString()}) WHERE ${objectCriteria(criteria)}`, false)
     }
     slice(start, count) {
         return new Traversal(this.session, this `${this.toString()} SKIP ${start} LIMIT ${count}`, false)
@@ -447,7 +447,7 @@ class EdgeTraversal extends Traversal {
         return new VertexTraversal(this.session, this, `bothV()`, true)
     }
     where(criteria) {
-        return new EdgeTraversal(this.session, this, `${this.toString()} WHERE ${objectCriteria(criteria)}`, false)
+        return new EdgeTraversal(this.session, this, `select from (${this.toString()}) WHERE ${objectCriteria(criteria)}`, false)
     }
 }
 
@@ -474,7 +474,7 @@ class VertexTraversal extends Traversal {
         return new EdgeTraversal(this.session, this, `bothE('${edgeName}')`, true)
     }
     where(criteria) {
-        return new VertexTraversal(this.session, this, `${this.toString()} WHERE ${objectCriteria(criteria)}`, false)
+        return new VertexTraversal(this.session, this, `select from (${this.toString()}) WHERE ${objectCriteria(criteria)}`, false)
     }
 }
 
