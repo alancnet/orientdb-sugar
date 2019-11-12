@@ -1,6 +1,6 @@
 const gefer = require('gefer')
 const {AsyncGenerator} = require('generator-extensions')
-const {OrientDBClient} = require('orientjs')
+const {OrientDBClient, RecordID} = require('orientjs')
 const _ = require('lodash')
 
 const whatChanged = (record, data) => {
@@ -10,6 +10,7 @@ const whatChanged = (record, data) => {
 }
 
 const toRid = (record) => {
+    if (record instanceof RecordID) return record.toString()
     if (record && record['@rid']) return record['@rid'].toString()
 }
 
@@ -72,7 +73,10 @@ class Client {
     constructor(options) {
         this.client = OrientDBClient.connect({
             host: options.host,
-            port: options.port
+            port: options.port,
+            logger: options.log ? {
+                debug: options.log
+            } : null
         })
         this.options = options
     }
@@ -83,7 +87,7 @@ class Client {
      * @param {string} options.username Username
      * @param {string} options.password Password
      */
-    db(name, options = {}) {
+    db(name, options = this.options) {
         if (!name) name = name || options.database || options.name
         const session = this.client.then(client => client.session({
             name,
@@ -138,11 +142,74 @@ class Database {
     async upsert(name, query, data = {}) {
         return await new Class(this.session, name, this.options).upsert(query, data)
     }
+    async upsertVertexObject(object) {
+        object = {...object}
+        let name
+        const keys = Object.keys(object)
+        if (object['@class']) {
+            name = object['@class']
+            delete object['@class']
+        } else if (keys.length === 1 && keys[0].substr(0, 1) === keys[0].substr(0, 1).toUpperCase()) {
+            name = keys[0]
+            object = object[name]
+        } else {
+            throw new Error('upsertVertexObject needs an object with a @class property, or a single PascalCased object property naming the class.')
+        }
+        const entries = Object.entries(object)
+        const query = Object.fromEntries(entries.slice(0, 1))
+        const data = Object.fromEntries(entries.slice(1))
+        return await this.upsertVertex(name, query, data)
+    }
+    async upsertEdgeObject(object, from, to) {
+        object = {...object}
+        let name
+        const keys = Object.keys(object)
+        if (object['@class']) {
+            name = object['@class']
+            delete object['@class']
+        } else if (keys.length === 1 && keys[0].substr(0, 1) === keys[0].substr(0, 1).toUpperCase()) {
+            name = keys[0]
+            object = object[name]
+        } else {
+            throw new Error('upsertEdgeObject needs an object with a @class property, or a single PascalCased object property naming the class.')
+        }
+        from = from || toRid(await object.from)
+        to = to || toRid(await object.to)
+        if (!from || !to) throw new Error(`upsertEdgeObject missing from/to`)
+        const data = {...object}
+        delete data.from
+        delete data.to
+        return await this.upsertEdge(name, from, to, data)
+    }
     async upsertVertex(name, query, data) {
+        if (typeof name === 'object') return await this.upsertVertexObject(name)
         return await this.vertex(name).upsert(query, data)
     }
     async upsertEdge(name, from, to, data = {}) {
+        if (typeof name === 'object') return await this.upsertEdgeObject(name)
         return await this.edge(name).upsert(from, to, data)
+    }
+    async learn (from, edge, to, data) {
+        if (!Array.isArray(from)) from = [from]
+        if (!Array.isArray(to)) to = [to]
+        if (!Array.isArray(edge)) edge = [edge]
+        from = toRidArray(await Promise.all(from.map(obj => obj['@rid'] ? obj['@rid'] : this.upsertVertexObject(obj))))
+        to = toRidArray(await Promise.all(to.map(obj => obj['@rid'] ? obj['@rid'] : this.upsertVertexObject(obj))))
+        const edges = []
+        for (let fromRid of from) {
+            for (let toRid of to) {
+                for (let edgeDef of edge) {
+                    if (typeof edgeDef === 'string') edgeDef = this.edge(edgeDef)
+                    if (typeof edgeDef === 'object' && !(edgeDef instanceof Edge)) {
+                        if (data) throw new Error('Learn requires an edge object, or an edge class plus data. Not both.')
+                        edges.push(await this.upsertEdgeObject(edgeDef, fromRid, toRid))
+                    } else {
+                        edges.push(await edgeDef.upsert(fromRid, toRid, data))
+                    }
+                }
+            }
+        }
+        return edges
     }
     class(name) {
         return new Class(this.session, name, this.options)
@@ -152,6 +219,12 @@ class Database {
     }
     edge(name, base) {
         return new Edge(this.session, name, this.options).extends(base)
+    }
+    v(record) {
+        return new Vertex(this.session, 'V', this.options).traverse(record)
+    }
+    e(record) {
+        return new Edge(this.session, 'E', this.options).traverse(record)
     }
 }
 
@@ -270,17 +343,14 @@ class Class {
     traverse(record) {
         const rids = toRidArray(record)
         if (rids) {
-            return new Traversal(this.session, null, `select from [${rids.join(', ')}]`, false, this.options)
+            return new Traversal(this.session, null, `select distinct(*) from [${rids.join(', ')}]`, false, this.options)
         } else {
-            return new Traversal(this.session, null, `select from ${this.name}`, false, this.options)
+            return new Traversal(this.session, null, `select distinct(*) from ${this.name}`, false, this.options)
         }
     }
 }
 
 class Edge extends Class {
-    constructor(session, name, options) {
-        super(session, name, options)
-    }
     extends(base) {
         super.extends(base || 'E')
         return this
@@ -322,9 +392,9 @@ class Edge extends Class {
     traverse(record) {
         const rids = toRidArray(record)
         if (rids) {
-            return new EdgeTraversal(this.session, null, `select from [${rids.join(', ')}]`, false, this.options)
+            return new EdgeTraversal(this.session, null, `select distinct(*) from [${rids.join(', ')}]`, false, this.options)
         } else {
-            return new EdgeTraversal(this.session, null, `select from ${this.name}`, false, this.options)
+            return new EdgeTraversal(this.session, null, `select distinct(*) from ${this.name}`, false, this.options)
         }
     }
 }
@@ -372,9 +442,9 @@ class Vertex extends Class {
     traverse(record) {
         const rids = toRidArray(record)
         if (rids) {
-            return new VertexTraversal(this.session, null, `select from [${rids.join(', ')}]`, false, this.options)
+            return new VertexTraversal(this.session, null, `select distinct(*) from [${rids.join(', ')}]`, false, this.options)
         } else {
-            return new VertexTraversal(this.session, null, `select from ${this.name}`, false, this.options)
+            return new VertexTraversal(this.session, null, `select distinct(*) from ${this.name}`, false, this.options)
         }
     }
 }
@@ -396,7 +466,7 @@ class Traversal {
             if (this.chainable) {
                 return this.parent.toString(`${this.expression}.${expr}`)
             } else {
-                return `select expand(${expr}) from (${this.expression})`
+                return `select distinct(*) from (select expand(${expr}) from (${this.expression}))`
             }
         } else {
             if (this.chainable) {
@@ -434,7 +504,7 @@ class Traversal {
         return this.next()
     }
     where(criteria) {
-        return new Traversal(this.session, this, `select from (${this.toString()}) WHERE ${objectCriteria(criteria)}`, false)
+        return new Traversal(this.session, this, `select distinct(*) from (${this.toString()}) WHERE ${objectCriteria(criteria)}`, false)
     }
     slice(start, count) {
         return new Traversal(this.session, this `${this.toString()} SKIP ${start} LIMIT ${count}`, false)
@@ -455,7 +525,7 @@ class EdgeTraversal extends Traversal {
         return new VertexTraversal(this.session, this, `bothV()`, true)
     }
     where(criteria) {
-        return new EdgeTraversal(this.session, this, `select from (${this.toString()}) WHERE ${objectCriteria(criteria)}`, false)
+        return new EdgeTraversal(this.session, this, `select distinct(*) from (${this.toString()}) WHERE ${objectCriteria(criteria)}`, false)
     }
 }
 
@@ -482,7 +552,7 @@ class VertexTraversal extends Traversal {
         return new EdgeTraversal(this.session, this, `bothE('${edgeName.name || edgeName}')`, true)
     }
     where(criteria) {
-        return new VertexTraversal(this.session, this, `select from (${this.toString()}) WHERE ${objectCriteria(criteria)}`, false)
+        return new VertexTraversal(this.session, this, `select distinct(*) from (${this.toString()}) WHERE ${objectCriteria(criteria)}`, false)
     }
 }
 

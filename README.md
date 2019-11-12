@@ -1,15 +1,24 @@
-const { create } = require('./index')
+# OrientDB-Sugar
+
+Provides syntactic sugar, including gremlin-like operators, for Graph database operations on OrientDB.
+
+## Usage
+
+```javascript
+import { Client } from 'orientdb-sugar'
 
 async function main() {
-  const client = create({
+
+  // Connect to your server
+  const client = new Client({
     host: 'localhost',
     port: 2424,
-    database: 'test',
-    username: 'root',
-    password: 'root',
-    manageSchema: true,
-//    log: console.log
+    username: 'leroyjenkins',
+    password: 'ohgodhesgoingin',
+    manageSchema: true, // <-- Enables automatic creation of classes, properties, and indices.
+    log: console.log // <-- Enables you to see what commands and queries are being run.
   })
+
   const db = client.db('test')
 
   // Define a schema
@@ -92,8 +101,4 @@ async function main() {
   // Close the connection
   await client.close()
 }
-
-main().catch(err => {
-  console.error(err)
-  process.exit(1)
-})
+```
