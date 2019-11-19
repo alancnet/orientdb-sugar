@@ -88,6 +88,9 @@ async function main() {
   for await (let film of db.v(costars).out('ActedIn')) {
     console.log(film.name)
   }
+  for await (let edge of db.v(costars).outE()) {
+    console.log(edge['@class'])
+  }
 
   // Close the connection
   await client.close()

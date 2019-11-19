@@ -533,23 +533,23 @@ class VertexTraversal extends Traversal {
     next() {
         return this
     }
-    out(edgeName) {
-        return new VertexTraversal(this.session, this, `out('${edgeName.name || edgeName}')`, true)
+    out(...edgeNames) {
+        return new VertexTraversal(this.session, this, `out(${edgeNames.map(e => `'${e.name || e}'`).join(', ')})`, true)
     }
-    outE(edgeName) {
-        return new EdgeTraversal(this.session, this, `outE('${edgeName.name || edgeName}')`, true)
+    outE(...edgeNames) {
+        return new EdgeTraversal(this.session, this, `outE(${edgeNames.map(e => `'${e.name || e}'`).join(', ')})`, true)
     }
-    in(edgeName) {
-        return new VertexTraversal(this.session, this, `in('${edgeName.name || edgeName}')`, true)
+    in(...edgeNames) {
+        return new VertexTraversal(this.session, this, `in(${edgeNames.map(e => `'${e.name || e}'`).join(', ')})`, true)
     }
-    inE(edgeName) {
-        return new EdgeTraversal(this.session, this, `inE('${edgeName.name || edgeName}')`, true)
+    inE(...edgeNames) {
+        return new EdgeTraversal(this.session, this, `inE(${edgeNames.map(e => `'${e.name || e}'`).join(', ')})`, true)
     }
-    both(edgeName) {
-        return new VertexTraversal(this.session, this, `both('${edgeName.name || edgeName}')`, true)
+    both(...edgeNames) {
+        return new VertexTraversal(this.session, this, `both(${edgeNames.map(e => `'${e.name || e}'`).join(', ')})`, true)
     }
-    bothE(edgeName) {
-        return new EdgeTraversal(this.session, this, `bothE('${edgeName.name || edgeName}')`, true)
+    bothE(...edgeNames) {
+        return new EdgeTraversal(this.session, this, `bothE(${edgeNames.map(e => `'${e.name || e}'`).join(', ')})`, true)
     }
     where(criteria) {
         return new VertexTraversal(this.session, this, `select distinct(*) from (${this.toString()}) WHERE ${objectCriteria(criteria)}`, false)
