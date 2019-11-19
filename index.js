@@ -12,6 +12,7 @@ const whatChanged = (record, data) => {
 const toRid = (record) => {
     if (record instanceof RecordID) return record.toString()
     if (record && record['@rid']) return record['@rid'].toString()
+    if (typeof record === 'string') return record
 }
 
 const toRidArray = (records) => {
