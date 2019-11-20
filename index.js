@@ -3,6 +3,18 @@ const {AsyncGenerator} = require('generator-extensions')
 const {OrientDBClient, RecordID} = require('orientjs')
 const _ = require('lodash')
 
+const escapeObj = obj => Object.fromEntries(Object.entries(obj).map(([key, value]) => [key.startsWith('`') ? key : '`' + key + '`', value]))
+
+const track = async fn => {
+    const stack = new Error('at...').stack
+    try {
+        return await fn()
+    } catch (err) {
+        err.stack += stack
+        throw err
+    }
+}
+
 const whatChanged = (record, data) => {
     const changed = Object.entries(data).filter(([key, value]) => !_.eq(value, record[key]))
     if (changed.length) return Object.fromEntries(changed)
@@ -138,6 +150,7 @@ class Database {
         yield* new Class(this.session, name, this.options).select(query)
     }
     async update(name, record, data) {
+        if (!data || !Object.values(data).filter(x => x !== undefined).length) throw new Error('Update requires changes')
         return await new Class(this.session, name, this.options).update(record, data)
     }
     async upsert(name, query, data = {}) {
@@ -255,7 +268,7 @@ class Class {
                     promise: this.session.then(async s => {
                         const sql = `create class ${this.name} if not exists${base ? ` extends ${base}`:''}`
                         this.log(sql)
-                        await s.command(sql)
+                        await track(() => s.command(sql))
                         return s
                     })
                 }
@@ -277,7 +290,7 @@ class Class {
             this._schema.promise = this._schema.promise.then(async s => {
                 const sql = `create property ${this.name}.${name} if not exists ${type}`
                 this.log(sql)
-                await s.command(sql)
+                await track(() => s.command(sql))
                 return s
             })
             this.session = this._schema.promise
@@ -299,7 +312,7 @@ class Class {
             this._schema.promise = this._schema.promise.then(async s => {
                 const sql = `create index ${indexName} if not exists on ${this.name} (${properties.join(', ')}) ${type}`
                 this.log(sql)
-                await s.command(sql)
+                await track(() => s.command(sql))
                 return s
             })
             this.session = this._schema.promise
@@ -309,30 +322,31 @@ class Class {
 
     async insert(data) {
         const s = await this.session
-        return await s.insert().into(this.name).set(data).one()
+        return await track(() => s.insert().into(this.name).set(escapeObj(data)).one())
     }
 
     async get(query) {
         const s = await this.session
-        return await s.select().from(this.name).where(query).one()
+        return await track(() => s.select().from(this.name).where(escapeObj(query)).one())
     }
 
     async update(record, data) {
+        if (!data || !Object.values(data).filter(x => x !== undefined).length) throw new Error('Update requires changes')
         const s = await this.session
-        return await s.update(record['@rid'] || record).set(data).one()
+        return await track(() => s.update(record['@rid'] || record).set(escapeObj(data)).one())
     }
 
     async upsert(query, data = {}) {
         const s = await this.session
-        let record = await s.select().from(this.name).where(query).one()
+        let record = await track(() => s.select().from(this.name).where(escapeObj(query)).one())
         if (record) {
             const changed = whatChanged(record, data)
             if (changed) {
-                await s.update(record['@rid']).set(changed).one()
+                await track(() => s.update(record['@rid']).set(changed).one())
                 record = {...record, ...changed}
             }
         } else {
-            record = await s.insert().into(this.name).set({...query, ...data}).one()
+            record = await track(() => s.insert().into(this.name).set(escapeObj({...query, ...data})).one())
         }
         return record
     }
@@ -367,7 +381,7 @@ class Edge extends Class {
 
     async insert(from, to, data = {}) {
         const s = await this.session
-        return await s.create('EDGE', this.name).from(from).to(to).set(data).one()
+        return await track(() => s.create('EDGE', this.name).from(from).to(to).set(escapeObj(data)).one())
     }
     async upsert(from, to, data = {}) {
         from = from['@rid'] || from
@@ -377,11 +391,11 @@ class Edge extends Class {
         if (record) {
             const changed = whatChanged(record, data)
             if (changed) {
-                await s.update(record['@rid']).set(changed).one()
+                await track(() => s.update(record['@rid']).set(escapeObj(changed)).one())
                 record = {...record, ...changed}
             }
         } else {
-            record = await s.create('EDGE', this.name).from(from).to(to).set(data).one()
+            record = await track(() => s.create('EDGE', this.name).from(from).to(to).set(escapeObj(data)).one())
         }
         return record
     }
@@ -419,19 +433,19 @@ class Vertex extends Class {
 
     async insert(data) {
         const s = await this.session
-        return await s.create('VERTEX', this.name).set(data).one()
+        return await track(() => s.create('VERTEX', this.name).set(escapeObj(data)).one())
     }
     async upsert(query, data = {}) {
         const s = await this.session
-        let record = await s.select().from(this.name).where(query).one()
+        let record = await track(() => s.select().from(this.name).where(escapeObj(query)).one())
         if (record) {
             const changed = whatChanged(record, data)
             if (changed) {
-                await s.update(record['@rid']).set(changed).one()
+                await track(() => s.update(record['@rid']).set(escapeObj(changed)).one())
                 record = {...record, ...changed}
             }
         } else {
-            record = await s.create('VERTEX', this.name).set({...query, ...data}).one()
+            record = await track(() => s.create('VERTEX', this.name).set(escapeObj({...query, ...data})).one())
         }
         return record
     }
