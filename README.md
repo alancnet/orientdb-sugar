@@ -4,7 +4,7 @@ Provides syntactic sugar, including gremlin-like operators, for Graph database o
 
 ## API documentation
 
-[API documentation](JSDOC.md)
+[API documentation](https://github.com/alancnet/orientdb-sugar/blob/master/JSDOC.md)
 
 ## Usage
 
