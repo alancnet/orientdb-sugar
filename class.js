@@ -140,7 +140,7 @@ class Class {
 
   /**
    * Deletes records
-   * @param {object|string|object[]]|string[]]} query Object query, record, record ID, array of records, or array of record IDs.
+   * @param {(object|string|object[]|string[])} query Object query, record, record ID, array of records, or array of record IDs.
    */
   async delete(query) {
       const s = await this.session

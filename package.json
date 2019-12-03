@@ -11,5 +11,8 @@
   },
   "peerDependencies": {
     "orientjs": "^3.0.8"
+  },
+  "devDependencies": {
+    "jsdoc-to-markdown": "^5.0.3"
   }
 }

@@ -2,6 +2,10 @@
 
 Provides syntactic sugar, including gremlin-like operators, for Graph database operations on OrientDB.
 
+## API documentation
+
+[API documentation](JSDOC.md)
+
 ## Usage
 
 ```javascript
