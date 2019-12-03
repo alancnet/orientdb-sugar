@@ -4,24 +4,30 @@ async function main() {
   const client = create({
     host: 'localhost',
     port: 2424,
-    database: 'test',
     username: 'root',
     password: 'root',
     manageSchema: true,
-//    log: console.log
+    log: console.log
   })
-  const db = client.db('test')
+  const db = client.db('test2')
 
   // Define a schema
-  const Actor = db.vertex('Actor')
+  const Company = await db.class('Company')
+    .property('name', 'string')
+  const Studio = await db.class('Studio', Company)
+
+  // Add a record
+  const marvel = await Studio.insert({name: 'Marvel Studios'})
+
+  const Actor = await db.vertex('Actor')
     .property('name', 'string')
     .index('name', 'unique')
 
-  const ActedIn = db.edge('ActedIn')
+  const ActedIn = await db.edge('ActedIn')
 
-  const StarredIn = db.edge('StarredIn')
+  const StarredIn = await db.edge('StarredIn')
 
-  const Film = db.vertex('Film')
+  const Film = await db.vertex('Film')
     .property('name', 'string')
     .property('year', 'integer')
     .index('name', 'unique')
@@ -90,6 +96,16 @@ async function main() {
   }
   for await (let edge of db.v(costars).outE()) {
     console.log(edge['@class'])
+  }
+
+  // Delete some records
+  await Actor.delete({name: 'Jared Rushton'})
+  await Actor.delete(rdj)
+
+  // Do some safe raw SQL:
+  const actors = await db.sql`SELECT FROM Actor WHERE name != ${tomHanks.name}`.toArray()
+  for await (let edge of db.sql`SELECT FROM ActedIn`) {
+    console.log(edge)
   }
 
   // Close the connection

@@ -15,6 +15,30 @@ const track = async fn => {
     }
 }
 
+const promisify = obj => {
+    obj.then = (resolved, rejected) => {
+        obj.then = null
+        obj.session.then(
+            () => resolved(obj),
+            rejected
+        )
+    }
+    return obj
+}
+
+const iterate = async function*(result) {
+    const subject = gefer.subject()
+    result
+        .on('data', subject.next)
+        .on('error', subject.error)
+        .on('end', subject.return)
+    yield* subject()
+}
+
+const one = async (iterator) => {
+    for await (let item of iterator) return item
+}
+
 const whatChanged = (record, data) => {
     const changed = Object.entries(data).filter(([key, value]) => !_.eq(value, record[key]))
     if (changed.length) return Object.fromEntries(changed)
@@ -51,6 +75,8 @@ const ops = {
     $in: (f, v) => `\`${f}\` in ${JSON.stringify(v)}`,
     $nin: (f, v) => `\`${f}\` not in ${JSON.stringify(v)}`
 }
+
+const querify = (v) => (v instanceof RecordID || typeof v === 'string' || v[Symbol.iterator]) ? {'@rid': toRidArray(v)} : v
 
 const objectCriteria = (obj) => {
     if (Object.keys(obj).some(x => x.startsWith('$'))) {
@@ -95,18 +121,24 @@ class Client {
     }
     /**
      * 
-     * @param {string} name Database name, defaults to database specified in client options.
+     * @param {string} name Database name, defaults to database specified in client options. Will create database if manageSchema is true.
      * @param {object} options 
      * @param {string} options.username Username
      * @param {string} options.password Password
      */
     db(name, options = this.options) {
         if (!name) name = name || options.database || options.name
-        const session = this.client.then(client => client.session({
+        const creds = {
             name,
             username: options.username || this.options.username,
             password: options.password || this.options.password
-        }))
+        }
+        const session = this.client.then(async client => {
+            if (this.options.manageSchema && !await client.existsDatabase(creds)) {
+                await client.createDatabase(creds)
+            }
+            return await client.session(creds)
+        })
 
         return new Database(session, {
             ...options,
@@ -120,11 +152,52 @@ class Client {
     }
 }
 
+/**
+ * @typedef Record
+ * @property {(string|RecordID)} @rid
+ * @property {('VERTEX'|'EDGE'|null)} @type
+ */
+
+/**
+ * @typedef {(string|RecordID|Record|Array.<string>|Array.<RecordID>|Array.<Record>)} Reference
+ */
+
 class Database {
     constructor(session, options) {
         this.session = session
         this.options = options
     }
+    /**
+     * Execute SQL as a template.
+     * 
+     * @example await db.sql`SELECT FROM User WHERE name = ${myName}`.toArray()
+     * @example for await (let record of db.sql`SELECT FROM User WHERE name = ${myName}`)
+     * @returns {AsyncIterable.<*>}
+     */
+    async * sql(template, ...args) {
+        if (typeof template === 'string') throw new Error(`.sql() is meant to be used as a string template, not called as a function directly.`)
+        let p = 0
+        let sql = []
+        const params = {}
+        for (let i = 0; i < template.length; i++) {
+            if (i) {
+                const pname = `p${p++}`
+                sql.push(`:${pname}`)
+                params[pname] = args[i - 1]
+            }
+            sql.push(template[i])
+        }
+        yield* this.query(sql.join(''), {params})
+    }
+
+    /**
+     * Execute Raw SQL.
+     * @param {string} queryText Raw SQL
+     * @param {object} options Query options
+     * @param {object} options.params Query parameters
+     * @returns {AsyncIterable.<*>}
+     * @example await db.query('SELECT FROM User WHERE name = :p1', {params: {p1: 'Tom Hanks'}}).toArray()
+     */
     async * query(queryText, options) {
         const subject = gefer.subject()
         const s = await this.session
@@ -134,28 +207,89 @@ class Database {
             .on('end', subject.return)
         yield* subject()
     }
+    /**
+     * Inserts a regular record.
+     * @param {string} name Name of the class / table
+     * @param {object} record Record data
+     * @returns {object} The inserted record
+     * @example await db.insert('User', {name: 'Tom Hanks'})
+     * @returns {Record}
+     */
     async insert(name, record) {
         return await new Class(this.session, name, this.options).insert(record)
     }
+    /**
+     * Inserts a vertex record.
+     * @param {string} name Name of the vertex class
+     * @param {object} data Record data
+     * @returns {object} The inserted record
+     * @example await db.insert('User', {name: 'Tom Hanks'})
+     * @returns {Record}
+     */
     async insertVertex(name, data) {
         return await this.vertex(name).insert(data)
     }
+    /**
+     * Inserts an edge record.
+     * @param {string} name Name of the edge class
+     * @param {Reference} from Record edge comes out of / from
+     * @param {Reference} to Record edge goes into / to
+     * @param {object} data Record data
+     * @returns {object} The inserted record
+     * @example await db.insert('User', {name: 'Tom Hanks'})
+     * @returns {Record}
+     */
     async insertEdge(name, from, to, data = {}) {
         return await this.edge(name).insert(from, to, data)
     }
-    async get(name, query) {
-        return await new Class(this.session, name, this.options).get(query)
+    /**
+     * Gets a single record
+     * @param {String} name Name of the class
+     * @param {Reference} reference Record to get
+     * @returns {Record}
+     */
+    async get(name, reference) {
+        return await new Class(this.session, name, this.options).get(reference)
     }
-    async* select(name, query) {
-        yield* new Class(this.session, name, this.options).select(query)
+
+    /**
+     * Gets multiple records
+     * @param {string} name Name of the class
+     * @param {Reference} reference Records to get
+     * @returns {AsyncIterator.<Record>}
+     */
+    async* select(name, reference) {
+        yield* new Class(this.session, name, this.options).select(reference)
     }
-    async update(name, record, data) {
+
+    /** 
+     * Updates records
+     * @param {string} name Name of the class
+     * @param {Reference} reference Records to update
+     * @param {object} data Data to update
+     */
+    async update(name, reference, data) {
         if (!data || !Object.values(data).filter(x => x !== undefined).length) throw new Error('Update requires changes')
-        return await new Class(this.session, name, this.options).update(record, data)
+        return await new Class(this.session, name, this.options).update(reference, data)
     }
+
+    /**
+     * Creates or updates a record. The resulting record would be a combination of query and data.
+     * @param {name} name Name of the class
+     * @param {object} query Object containing identifier of the record.
+     * @param {object} data Additional properties of the record.
+     */
     async upsert(name, query, data = {}) {
         return await new Class(this.session, name, this.options).upsert(query, data)
     }
+
+    /**
+     * Creates or updates a single Vertex. *Important* The first property is assumed to be the identifier.
+     * @param {object} object An object with a @class property, or a single PascalCased object property naming the class.
+     * @example await upsertVertexObject({ User: { id: 123, name: 'Tom Hanks' }})
+     * @example await upsertVertexObject({ '@class': 'User', id: 123, name: 'Tom Hanks' })
+     * @returns {Record}
+     */
     async upsertVertexObject(object) {
         object = {...object}
         let name
@@ -174,6 +308,12 @@ class Database {
         const data = Object.fromEntries(entries.slice(1))
         return await this.upsertVertex(name, query, data)
     }
+    /**
+     * Creates or updates an edge. *Important* the `out` and `in` properties are assumed to be a compound key.
+     * @param {object} object An object with a @class property, or a single PascalCased object property naming the class.
+     * @param {Reference} from Record edge comes out of / from
+     * @param {Reference} to Record edge goes into / to
+     */
     async upsertEdgeObject(object, from, to) {
         object = {...object}
         let name
@@ -195,14 +335,49 @@ class Database {
         delete data.to
         return await this.upsertEdge(name, from, to, data)
     }
+    /**
+     * Creates or updates a vertex. The resulting record would be a combination of query and data.
+     * @param {name} name Name of the vertex
+     * @param {object} query Object containing identifier of the record.
+     * @param {object} data Additional properties of the record.
+     */
     async upsertVertex(name, query, data) {
         if (typeof name === 'object') return await this.upsertVertexObject(name)
         return await this.vertex(name).upsert(query, data)
     }
+    /**
+     * Creates or updates an edge. The resulting record would be a combination of query and data.
+     * @param {name} name Name of the edge
+     * @param {object} query Object containing identifier of the record.
+     * @param {Reference} from Record edge comes out of / from
+     * @param {Reference} to Record edge goes into / to
+     * @param {object} data Additional properties of the edge.
+     */
     async upsertEdge(name, from, to, data = {}) {
         if (typeof name === 'object') return await this.upsertEdgeObject(name)
         return await this.edge(name).upsert(from, to, data)
     }
+    /**
+     * Store basic knowledge by upserting vertices and edges
+     * @param {(object|Array.<object>)} from An object with a @class property, or a single PascalCased object property naming the class.
+     * @param {(string|object|Array.<string>|Array.<object>)} edge Edge class name, or an object with a @class property, or a single PascalCased object property naming the class.
+     * @param {(object|Array.<object>)} to An object with a @class property, or a single PascalCased object property naming the class.
+     * @param {object} data Additional properties for the edge
+     * 
+     * @example
+     *   await db.learn(
+     *       { Actor: { name: 'Jared Rushton' }},
+     *       'ActedIn',
+     *       { Film: { name: 'Big'}}
+     *   )
+     * @example
+     *   await db.learn(
+     *       { Actor: { name: 'Jared Rushton' }},
+     *       ['ActedIn', 'CostarredIn'],
+     *       { Film: { name: 'Big'}},
+     *       { character: 'Billy' }
+     *   )
+     */
     async learn (from, edge, to, data) {
         if (!Array.isArray(from)) from = [from]
         if (!Array.isArray(to)) to = [to]
@@ -225,23 +400,52 @@ class Database {
         }
         return edges
     }
-    class(name) {
-        return new Class(this.session, name, this.options)
+    /**
+     * References a class. If manageSchema is true, ensures the class exists.
+     * @param {string} name Name of class
+     * @param {(Class|string)} base Base class
+     */
+    class(name, base) {
+        return new Class(this.session, name, this.options).extends(base)
     }
+    /**
+     * References a vertex class. If manageSchema is true, ensures the class exists.
+     * @param {string} name 
+     * @param {(Vertex|string)} base Base vertex class
+     */
     vertex(name, base) {
         return new Vertex(this.session, name, this.options).extends(base)
     }
+    /**
+     * References an edge class. If manageSchema is true, ensures the class exists.
+     * @param {string} name 
+     * @param {(Edge|string)} base Base edge class
+     * @returns {Vertex}
+     */
     edge(name, base) {
         return new Edge(this.session, name, this.options).extends(base)
     }
-    v(record) {
-        return new Vertex(this.session, 'V', this.options).traverse(record)
+    /**
+     * Begins a traversal at the specified vertices
+     * @param {Reference} reference 
+     * @return {VertexTraversal}
+     */
+    v(reference) {
+        return new Vertex(this.session, 'V', this.options).traverse(reference)
     }
-    e(record) {
-        return new Edge(this.session, 'E', this.options).traverse(record)
+    /**
+     * Begins a traversal at the specified edges
+     * @param {Reference} reference
+     * @returns {EdgeTraversal}
+     */
+    e(reference) {
+        return new Edge(this.session, 'E', this.options).traverse(reference)
     }
 }
 
+/**
+ * @extends {Promise<Class>}
+ */
 class Class {
     constructor(session, name, options) {
         this.name = name
@@ -251,6 +455,8 @@ class Class {
         } else {
             this.session = session
         }
+        this.type = null
+        promisify(this)
     }
 
     log(...args) {
@@ -266,9 +472,9 @@ class Class {
             if (!this.options.schema[this.name]) {
                 this.options.schema[this.name] = {
                     promise: this.session.then(async s => {
-                        const sql = `create class ${this.name} if not exists${base ? ` extends ${base}`:''}`
+                        const sql = `create class ${this.name} if not exists${base ? ` extends ${base.name || base}`:''}`
                         this.log(sql)
-                        await track(() => s.command(sql))
+                        await track(() => one(s.command(sql)))
                         return s
                     })
                 }
@@ -320,22 +526,44 @@ class Class {
         return this
     }
 
-    async insert(data) {
+    /**
+     * Inserts a regular record.
+     * @param {object} record Record data
+     * @returns {object} The inserted record
+     * @example await db.insert('User', {name: 'Tom Hanks'})
+     * @returns {Record}
+     */
+    async insert(record) {
         const s = await this.session
-        return await track(() => s.insert().into(this.name).set(escapeObj(data)).one())
+        return await track(() => s.insert().into(this.name).set(escapeObj(record)).one())
     }
 
-    async get(query) {
+    /**
+     * Gets a single record
+     * @param {Reference} reference Record to get
+     * @returns {Record}
+     */
+    async get(reference) {
         const s = await this.session
-        return await track(() => s.select().from(this.name).where(escapeObj(query)).one())
+        return await track(() => s.select().from(this.name).where(escapeObj(querify(reference))).one())
     }
 
+    /** 
+     * Updates records
+     * @param {Reference} reference Records to update
+     * @param {object} data Data to update
+     */
     async update(record, data) {
         if (!data || !Object.values(data).filter(x => x !== undefined).length) throw new Error('Update requires changes')
         const s = await this.session
         return await track(() => s.update(record['@rid'] || record).set(escapeObj(data)).one())
     }
 
+    /**
+     * Creates or updates a record. The resulting record would be a combination of query and data.
+     * @param {object} query Object containing identifier of the record.
+     * @param {object} data Additional properties of the record.
+     */
     async upsert(query, data = {}) {
         const s = await this.session
         let record = await track(() => s.select().from(this.name).where(escapeObj(query)).one())
@@ -351,12 +579,29 @@ class Class {
         return record
     }
 
+    /**
+     * Deletes records
+     * @param {object|string|object[]]|string[]]} query Object query, record, record ID, array of records, or array of record IDs.
+     */
+    async delete(query) {
+        const s = await this.session
+        await track(() => s.delete(this.type || '').from(this.name).where(escapeObj(querify(query))).one())
+    }
+
+    /**
+     * Begins traversal with query
+     * @param {object} query
+     */
     select(query) {
         return query ? this.traverse().where(query) : this.traverse()
     }
 
-    traverse(record) {
-        const rids = toRidArray(record)
+    /**
+     * Begins traversal with records
+     * @param {Reference} reference 
+     */
+    traverse(reference) {
+        const rids = toRidArray(reference)
         if (rids) {
             return new Traversal(this.session, null, `select distinct(*) from [${rids.join(', ')}]`, false, this.options)
         } else {
@@ -366,23 +611,56 @@ class Class {
 }
 
 class Edge extends Class {
+    constructor(session, name, options) {
+        super(session, name, options)
+        this.type = 'EDGE'
+    }
+    /**
+     * Creates a new class in the schema.
+     * @param {string} base Optional base class
+     */
     extends(base) {
         super.extends(base || 'E')
         return this
     }
+    /**
+     * Creates a new property in the schema. It requires that the class for the property already exist on the database.
+     * @param {string} name Defines the logical name for the property.
+     * @param {string} type Defines the property data type.
+     */
     property(name, type) {
         super.property(name, type)
         return this
     }
+    /**
+     * Ensures an index exists. If the index already exists, this will not overwrite or reconfigure it.
+     * @param {string[]} properties Array of properties to include in the index
+     * @param {string} type Defines the index type that you want to use.
+     * @param {string} name Optional. Specify the name of the index.
+     */
     index(properties, type, name) {
         super.index(properties, type, name)
         return this
     }
 
+    /**
+     * Inserts an edge record.
+     * @param {Reference} from Source record
+     * @param {Reference} to Target record
+     * @param {object} data Edge record data
+     * @returns {Record}
+     */
     async insert(from, to, data = {}) {
         const s = await this.session
-        return await track(() => s.create('EDGE', this.name).from(from).to(to).set(escapeObj(data)).one())
+        return await track(() => s.create('EDGE', this.name).from(toRid(from)).to(toRid(to)).set(escapeObj(data)).one())
     }
+    /**
+     * Ensures an edge exists, and updates its data.
+     * @param {Reference} from Source record
+     * @param {Reference} to Target record
+     * @param {object} data Edge record data
+     * @returns {Record}
+     */
     async upsert(from, to, data = {}) {
         from = from['@rid'] || from
         to = to['@rid'] || to
@@ -395,15 +673,23 @@ class Edge extends Class {
                 record = {...record, ...changed}
             }
         } else {
-            record = await track(() => s.create('EDGE', this.name).from(from).to(to).set(escapeObj(data)).one())
+            record = await track(() => s.create('EDGE', this.name).from(toRid(from)).to(toRid(to)).set(escapeObj(data)).one())
         }
         return record
     }
 
+    /**
+     * Begins traversal with query
+     * @param {object} query
+     */
     select(query) {
         return query ? this.traverse().where(query) : this.traverse()
     }
 
+    /**
+     * Begins traversal with records
+     * @param {Reference} reference 
+     */
     traverse(record) {
         const rids = toRidArray(record)
         if (rids) {
@@ -417,24 +703,51 @@ class Edge extends Class {
 class Vertex extends Class {
     constructor(session, name, options) {
         super(session, name, options)
+        this.type = 'VERTEX'
     }
+    /**
+     * Creates a new class in the schema.
+     * @param {string} base Optional base class
+     */
     extends(base) {
         super.extends(base || 'V')
         return this
     }
+    /**
+     * Creates a new property in the schema. It requires that the class for the property already exist on the database.
+     * @param {string} name Defines the logical name for the property.
+     * @param {string} type Defines the property data type.
+     */
     property(name, type) {
         super.property(name, type)
         return this
     }
+    /**
+     * Ensures an index exists. If the index already exists, this will not overwrite or reconfigure it.
+     * @param {string[]} properties Array of properties to include in the index
+     * @param {string} type Defines the index type that you want to use.
+     * @param {string} name Optional. Specify the name of the index.
+     */
     index(properties, type, name) {
         super.index(properties, type, name)
         return this
     }
 
+    /**
+     * Inserts a vertex record
+     * @param {object} data
+     * @returns {Record}
+     */
     async insert(data) {
         const s = await this.session
         return await track(() => s.create('VERTEX', this.name).set(escapeObj(data)).one())
     }
+    /**
+     * Creates or updates a vertex. The resulting vertex would be a combination of query and data.
+     * @param {name} name Name of the class
+     * @param {object} query Object containing identifier of the vertex.
+     * @param {object} data Additional properties of the vertex.
+     */
     async upsert(query, data = {}) {
         const s = await this.session
         let record = await track(() => s.select().from(this.name).where(escapeObj(query)).one())
@@ -450,10 +763,18 @@ class Vertex extends Class {
         return record
     }
 
+    /**
+     * Begins traversal with query
+     * @param {object} query
+     */
     select(query) {
         return query ? this.traverse().where(query) : this.traverse()
     }
 
+    /**
+     * Begins traversal with records
+     * @param {Reference} reference 
+     */
     traverse(record) {
         const rids = toRidArray(record)
         if (rids) {
@@ -492,15 +813,10 @@ class Traversal {
         }
     }
     async *[Symbol.asyncIterator]() {
-        const subject = gefer.subject()
         const s = await this.session
         const query = this.toString()
         this.log(query)
-        s.query(query)
-            .on('data', subject.next)
-            .on('error', subject.error)
-            .on('end', subject.return)
-        yield* subject()
+        yield* iterate(s.query(query))
     }
     async toArray() {
         let ret = []
