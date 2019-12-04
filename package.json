@@ -1,18 +1,22 @@
 {
   "name": "orientdb-sugar",
   "description": "Syntactic sugar for OrientDB using orientjs.",
-  "version": "0.0.18",
+  "version": "0.0.22",
   "main": "index.js",
   "license": "MIT",
+  "scripts": {
+    "prepack": "rm -rf node_modules/orientjs/node_modules"
+  },
   "dependencies": {
+    "arrify": "^2.0.1",
     "gefer": "^1.0.1",
     "generator-extensions": "^1.0.3",
-    "lodash": "^4.17.15"
-  },
-  "peerDependencies": {
+    "lodash": "^4.17.15",
+    "parse-function": "5.4.4",
     "orientjs": "^3.0.8"
   },
   "devDependencies": {
     "jsdoc-to-markdown": "^5.0.3"
-  }
+  },
+  "bundledDependencies": ["orientjs", "parse-function", "arrify"]
 }
