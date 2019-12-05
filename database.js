@@ -7,8 +7,8 @@ const Edge = require('./edge')
 
 class Database {
   constructor(session, options) {
-      this.session = session
-      this.options = options
+    this.session = session
+    this.options = options
   }
   /**
    * Execute SQL as a template.
@@ -18,19 +18,19 @@ class Database {
    * @returns {AsyncIterable.<*>}
    */
   async * sql(template, ...args) {
-      if (typeof template === 'string') throw new Error(`.sql() is meant to be used as a string template, not called as a function directly.`)
-      let p = 0
-      let sql = []
-      const params = {}
-      for (let i = 0; i < template.length; i++) {
-          if (i) {
-              const pname = `p${p++}`
-              sql.push(`:${pname}`)
-              params[pname] = args[i - 1]
-          }
-          sql.push(template[i])
+    if (typeof template === 'string') throw new Error(`.sql() is meant to be used as a string template, not called as a function directly.`)
+    let p = 0
+    let sql = []
+    const params = {}
+    for (let i = 0; i < template.length; i++) {
+      if (i) {
+        const pname = `p${p++}`
+        sql.push(`:${pname}`)
+        params[pname] = args[i - 1]
       }
-      yield* this.query(sql.join(''), {params})
+      sql.push(template[i])
+    }
+    yield* this.query(sql.join(''), { params })
   }
 
   /**
@@ -42,14 +42,33 @@ class Database {
    * @example await db.query('SELECT FROM User WHERE name = :p1', {params: {p1: 'Tom Hanks'}}).toArray()
    */
   async * query(queryText, options) {
-      const subject = gefer.subject()
-      const s = await this.session
-      s.query(queryText, options)
-          .on('data', subject.next)
-          .on('error', subject.error)
-          .on('end', subject.return)
-      yield* subject()
+    const subject = gefer.subject()
+    const s = await this.session
+    s.query(queryText, options)
+      .on('data', subject.next)
+      .on('error', subject.error)
+      .on('end', subject.return)
+    yield* subject()
   }
+
+  /**
+   * Execute Raw SQL.
+   * @param {string} queryText Raw SQL
+   * @param {object} options Query options
+   * @param {object} options.params Query parameters
+   * @returns {AsyncIterable.<*>}
+   * @example await db.query(`INSERT INTO User SET name = ${name}`).toArray()
+   */
+  async * command(queryText, options) {
+    const subject = gefer.subject()
+    const s = await this.session
+    s.command(queryText, options)
+      .on('data', subject.next)
+      .on('error', subject.error)
+      .on('end', subject.return)
+    yield* subject()
+  }
+
   /**
    * Inserts a regular record.
    * @param {string} name Name of the class / table
@@ -59,7 +78,7 @@ class Database {
    * @returns {Record}
    */
   async insert(name, record) {
-      return await new Class(this.session, name, this.options).insert(record)
+    return await new Class(this.session, name, this.options).insert(record)
   }
   /**
    * Inserts a vertex record.
@@ -70,7 +89,7 @@ class Database {
    * @returns {Record}
    */
   async insertVertex(name, data) {
-      return await this.vertex(name).insert(data)
+    return await this.vertex(name).insert(data)
   }
   /**
    * Inserts an edge record.
@@ -83,7 +102,7 @@ class Database {
    * @returns {Record}
    */
   async insertEdge(name, from, to, data = {}) {
-      return await this.edge(name).insert(from, to, data)
+    return await this.edge(name).insert(from, to, data)
   }
   /**
    * Gets a single record
@@ -92,7 +111,7 @@ class Database {
    * @returns {Record}
    */
   async get(name, reference) {
-      return await new Class(this.session, name, this.options).get(reference)
+    return await new Class(this.session, name, this.options).get(reference)
   }
 
   /**
@@ -102,7 +121,7 @@ class Database {
    * @returns {AsyncIterator.<Record>}
    */
   async* select(name, reference) {
-      yield* new Class(this.session, name, this.options).select(reference)
+    yield* new Class(this.session, name, this.options).select(reference)
   }
 
   /** 
@@ -112,8 +131,8 @@ class Database {
    * @param {object} data Data to update
    */
   async update(name, reference, data) {
-      if (!data || !Object.values(data).filter(x => x !== undefined).length) throw new Error('Update requires changes')
-      return await new Class(this.session, name, this.options).update(reference, data)
+    if (!data || !Object.values(data).filter(x => x !== undefined).length) throw new Error('Update requires changes')
+    return await new Class(this.session, name, this.options).update(reference, data)
   }
 
   /**
@@ -123,7 +142,7 @@ class Database {
    * @param {object} data Additional properties of the record.
    */
   async upsert(name, query, data = {}) {
-      return await new Class(this.session, name, this.options).upsert(query, data)
+    return await new Class(this.session, name, this.options).upsert(query, data)
   }
 
   /**
@@ -134,22 +153,22 @@ class Database {
    * @returns {Record}
    */
   async upsertVertexObject(object) {
-      object = {...object}
-      let name
-      const keys = Object.keys(object)
-      if (object['@class']) {
-          name = object['@class']
-          delete object['@class']
-      } else if (keys.length === 1 && keys[0].substr(0, 1) === keys[0].substr(0, 1).toUpperCase()) {
-          name = keys[0]
-          object = object[name]
-      } else {
-          throw new Error('upsertVertexObject needs an object with a @class property, or a single PascalCased object property naming the class.')
-      }
-      const entries = Object.entries(object)
-      const query = Object.fromEntries(entries.slice(0, 1))
-      const data = Object.fromEntries(entries.slice(1))
-      return await this.upsertVertex(name, query, data)
+    object = { ...object }
+    let name
+    const keys = Object.keys(object)
+    if (object['@class']) {
+      name = object['@class']
+      delete object['@class']
+    } else if (keys.length === 1 && keys[0].substr(0, 1) === keys[0].substr(0, 1).toUpperCase()) {
+      name = keys[0]
+      object = object[name]
+    } else {
+      throw new Error('upsertVertexObject needs an object with a @class property, or a single PascalCased object property naming the class.')
+    }
+    const entries = Object.entries(object)
+    const query = Object.fromEntries(entries.slice(0, 1))
+    const data = Object.fromEntries(entries.slice(1))
+    return await this.upsertVertex(name, query, data)
   }
   /**
    * Creates or updates an edge. *Important* the `out` and `in` properties are assumed to be a compound key.
@@ -158,25 +177,25 @@ class Database {
    * @param {Reference} to Record edge goes into / to
    */
   async upsertEdgeObject(object, from, to) {
-      object = {...object}
-      let name
-      const keys = Object.keys(object)
-      if (object['@class']) {
-          name = object['@class']
-          delete object['@class']
-      } else if (keys.length === 1 && keys[0].substr(0, 1) === keys[0].substr(0, 1).toUpperCase()) {
-          name = keys[0]
-          object = object[name]
-      } else {
-          throw new Error('upsertEdgeObject needs an object with a @class property, or a single PascalCased object property naming the class.')
-      }
-      from = from || toRid(await object.from)
-      to = to || toRid(await object.to)
-      if (!from || !to) throw new Error(`upsertEdgeObject missing from/to`)
-      const data = {...object}
-      delete data.from
-      delete data.to
-      return await this.upsertEdge(name, from, to, data)
+    object = { ...object }
+    let name
+    const keys = Object.keys(object)
+    if (object['@class']) {
+      name = object['@class']
+      delete object['@class']
+    } else if (keys.length === 1 && keys[0].substr(0, 1) === keys[0].substr(0, 1).toUpperCase()) {
+      name = keys[0]
+      object = object[name]
+    } else {
+      throw new Error('upsertEdgeObject needs an object with a @class property, or a single PascalCased object property naming the class.')
+    }
+    from = from || toRid(await object.from)
+    to = to || toRid(await object.to)
+    if (!from || !to) throw new Error(`upsertEdgeObject missing from/to`)
+    const data = { ...object }
+    delete data.from
+    delete data.to
+    return await this.upsertEdge(name, from, to, data)
   }
   /**
    * Creates or updates a vertex. The resulting record would be a combination of query and data.
@@ -185,8 +204,8 @@ class Database {
    * @param {object} data Additional properties of the record.
    */
   async upsertVertex(name, query, data) {
-      if (typeof name === 'object') return await this.upsertVertexObject(name)
-      return await this.vertex(name).upsert(query, data)
+    if (typeof name === 'object') return await this.upsertVertexObject(name)
+    return await this.vertex(name).upsert(query, data)
   }
   /**
    * Creates or updates an edge. The resulting record would be a combination of query and data.
@@ -197,8 +216,8 @@ class Database {
    * @param {object} data Additional properties of the edge.
    */
   async upsertEdge(name, from, to, data = {}) {
-      if (typeof name === 'object') return await this.upsertEdgeObject(name)
-      return await this.edge(name).upsert(from, to, data)
+    if (typeof name === 'object') return await this.upsertEdgeObject(name)
+    return await this.edge(name).upsert(from, to, data)
   }
   /**
    * Store basic knowledge by upserting vertices and edges
@@ -221,27 +240,27 @@ class Database {
    *       { character: 'Billy' }
    *   )
    */
-  async learn (from, edge, to, data) {
-      if (!Array.isArray(from)) from = [from]
-      if (!Array.isArray(to)) to = [to]
-      if (!Array.isArray(edge)) edge = [edge]
-      from = toRidArray(await Promise.all(from.map(obj => obj['@rid'] ? obj['@rid'] : this.upsertVertexObject(obj))))
-      to = toRidArray(await Promise.all(to.map(obj => obj['@rid'] ? obj['@rid'] : this.upsertVertexObject(obj))))
-      const edges = []
-      for (let fromRid of from) {
-          for (let toRid of to) {
-              for (let edgeDef of edge) {
-                  if (typeof edgeDef === 'string') edgeDef = this.edge(edgeDef)
-                  if (typeof edgeDef === 'object' && !(edgeDef instanceof Edge)) {
-                      if (data) throw new Error('Learn requires an edge object, or an edge class plus data. Not both.')
-                      edges.push(await this.upsertEdgeObject(edgeDef, fromRid, toRid))
-                  } else {
-                      edges.push(await edgeDef.upsert(fromRid, toRid, data))
-                  }
-              }
+  async learn(from, edge, to, data) {
+    if (!Array.isArray(from)) from = [from]
+    if (!Array.isArray(to)) to = [to]
+    if (!Array.isArray(edge)) edge = [edge]
+    from = toRidArray(await Promise.all(from.map(obj => obj['@rid'] ? obj['@rid'] : this.upsertVertexObject(obj))))
+    to = toRidArray(await Promise.all(to.map(obj => obj['@rid'] ? obj['@rid'] : this.upsertVertexObject(obj))))
+    const edges = []
+    for (let fromRid of from) {
+      for (let toRid of to) {
+        for (let edgeDef of edge) {
+          if (typeof edgeDef === 'string') edgeDef = this.edge(edgeDef)
+          if (typeof edgeDef === 'object' && !(edgeDef instanceof Edge)) {
+            if (data) throw new Error('Learn requires an edge object, or an edge class plus data. Not both.')
+            edges.push(await this.upsertEdgeObject(edgeDef, fromRid, toRid))
+          } else {
+            edges.push(await edgeDef.upsert(fromRid, toRid, data))
           }
+        }
       }
-      return edges
+    }
+    return edges
   }
   /**
    * References a class. If manageSchema is true, ensures the class exists.
@@ -249,7 +268,7 @@ class Database {
    * @param {(Class|string)} base Base class
    */
   class(name, base) {
-      return new Class(this.session, name, this.options).extends(base)
+    return new Class(this.session, name, this.options).extends(base)
   }
   /**
    * References a vertex class. If manageSchema is true, ensures the class exists.
@@ -257,7 +276,7 @@ class Database {
    * @param {(Vertex|string)} base Base vertex class
    */
   vertex(name, base) {
-      return new Vertex(this.session, name, this.options).extends(base)
+    return new Vertex(this.session, name, this.options).extends(base)
   }
   /**
    * References an edge class. If manageSchema is true, ensures the class exists.
@@ -266,7 +285,7 @@ class Database {
    * @returns {Edge}
    */
   edge(name, base) {
-      return new Edge(this.session, name, this.options).extends(base)
+    return new Edge(this.session, name, this.options).extends(base)
   }
   /**
    * Begins a traversal at the specified vertices
@@ -274,7 +293,7 @@ class Database {
    * @return {VertexTraversal}
    */
   v(reference) {
-      return new Vertex(this.session, 'V', this.options).traverse(reference)
+    return new Vertex(this.session, 'V', this.options).traverse(reference)
   }
   /**
    * Begins a traversal at the specified edges
@@ -282,7 +301,7 @@ class Database {
    * @returns {EdgeTraversal}
    */
   e(reference) {
-      return new Edge(this.session, 'E', this.options).traverse(reference)
+    return new Edge(this.session, 'E', this.options).traverse(reference)
   }
 }
 
