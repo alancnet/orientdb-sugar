@@ -33,7 +33,7 @@ class Class {
           promise: this.session.then(async s => {
             const sql = `create class ${this.name} if not exists${base ? ` extends ${base.name || base}` : ''}`
             this.log(sql)
-            await track(() => one(s.command(sql)))
+            await track(() => one(s.command(sql)).one())
             return s
           })
         }
@@ -55,7 +55,7 @@ class Class {
       this._schema.promise = this._schema.promise.then(async s => {
         const sql = `create property ${this.name}.${name} if not exists ${type}`
         this.log(sql)
-        await track(() => s.command(sql))
+        await track(() => s.command(sql).one())
         return s
       })
       this.session = this._schema.promise
@@ -77,7 +77,7 @@ class Class {
       this._schema.promise = this._schema.promise.then(async s => {
         const sql = `create index ${indexName} if not exists on ${this.name} (${properties.join(', ')}) ${type}`
         this.log(sql)
-        await track(() => s.command(sql))
+        await track(() => s.command(sql).one())
         return s
       })
       this.session = this._schema.promise
