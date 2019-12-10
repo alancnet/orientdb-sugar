@@ -1,4 +1,4 @@
-const {OrientDBClient} = require('orientjs')
+const { OrientDBClient } = require('orientjs')
 const _ = require('lodash')
 
 const Database = require('./database')
@@ -15,14 +15,14 @@ class Client {
    * @param {boolean} options.manageSchema Enables the client to create classes, properties, and indices. 
    */
   constructor(options) {
-      this.client = OrientDBClient.connect({
-          host: options.host,
-          port: options.port,
-          logger: options.log ? {
-              debug: options.log
-          } : null
-      })
-      this.options = options
+    this.client = OrientDBClient.connect({
+      host: options.host,
+      port: options.port,
+      logger: options.log ? {
+        debug: options.log
+      } : null
+    })
+    this.options = options
   }
   /**
    * 
@@ -32,28 +32,28 @@ class Client {
    * @param {string} options.password Password
    */
   db(name, options = this.options) {
-      if (!name) name = name || options.database || options.name
-      const creds = {
-          name,
-          username: options.username || this.options.username,
-          password: options.password || this.options.password
+    if (!name) name = name || options.database || options.name
+    const creds = {
+      name,
+      username: options.username || this.options.username,
+      password: options.password || this.options.password
+    }
+    const session = this.client.then(async client => {
+      if (this.options.manageSchema && !await client.existsDatabase(creds)) {
+        await client.createDatabase(creds)
       }
-      const session = this.client.then(async client => {
-          if (this.options.manageSchema && !await client.existsDatabase(creds)) {
-              await client.createDatabase(creds)
-          }
-          return await client.session(creds)
-      })
+      return await client.session(creds)
+    })
 
-      return new Database(session, {
-          ...options,
-          manageSchema: this.options.manageSchema,
-          log: this.options.log,
-          schema: {}
-      })
+    return new Database(session, {
+      ...options,
+      manageSchema: this.options.manageSchema,
+      log: this.options.log,
+      schema: {}
+    })
   }
   async close() {
-      return (await this.client).close()
+    return (await this.client).close()
   }
 }
 

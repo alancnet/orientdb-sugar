@@ -11,7 +11,9 @@
     "arrify": "^2.0.1",
     "gefer": "^1.0.1",
     "generator-extensions": "^1.0.3",
-    "lodash": "^4.17.15"
+    "lodash": "^4.17.15",
+    "nest-literal": "^1.0.0",
+    "parse-function": "5.4.4"
   },
   "devDependencies": {
     "jsdoc-to-markdown": "^5.0.3",

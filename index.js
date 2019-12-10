@@ -1,4 +1,4 @@
-const {RecordID} = require('orientjs')
+const { RecordID } = require('orientjs')
 
 const Client = require('./client')
 const Database = require('./database')
@@ -24,13 +24,13 @@ const EdgeTraversal = require('./edge-traversal')
 const create = opts => new Client(opts)
 
 module.exports = {
-    create,
-    Client,
-    Database,
-    Class,
-    Traversal,
-    Vertex,
-    Edge,
-    VertexTraversal,
-    EdgeTraversal
+  create,
+  Client,
+  Database,
+  Class,
+  Traversal,
+  Vertex,
+  Edge,
+  VertexTraversal,
+  EdgeTraversal
 }

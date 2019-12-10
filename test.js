@@ -17,7 +17,7 @@ async function main() {
   const Studio = await db.class('Studio', Company)
 
   // Add a record
-  const marvel = await Studio.insert({name: 'Marvel Studios'})
+  const marvel = await Studio.insert({ name: 'Marvel Studios' })
 
   const Actor = await db.vertex('Actor')
     .property('name', 'string')
@@ -46,14 +46,14 @@ async function main() {
 
   // By reference, "Learn Tom Hanks acted in Big"
   await db.learn(tomHanks, ActedIn, big)
-    
+
   // By anonymous, "Learn actor Jared Rushton acted in film Big as Billy".
   // This method assumes the only property of the first object is the class,
   // and the first property of the inner object is the unique identifier.
   await db.learn(
-    { Actor: { name: 'Jared Rushton' }}, // <-- Anonymous vertex upsert
+    { Actor: { name: 'Jared Rushton' } }, // <-- Anonymous vertex upsert
     'ActedIn',                           // <-- Edge name
-    { Film: { name: 'Big'}},             // <-- Anonymous vertex upsert
+    { Film: { name: 'Big' } },             // <-- Anonymous vertex upsert
     { character: 'Billy' }               // <-- Edge properties
   )
 
@@ -64,29 +64,29 @@ async function main() {
 
   await db.learn(
     [
-      {Actor: { name: 'Robert Downey Jr.'}},
-      {Actor: { name: 'Chris Evans' }},
-      {Actor: { name: 'Mark Ruffalo' }},
-      {Actor: { name: 'Chris Hemsworth' }},
-      {Actor: { name: 'Scarlett Johansson' }}
+      { Actor: { name: 'Robert Downey Jr.' } },
+      { Actor: { name: 'Chris Evans' } },
+      { Actor: { name: 'Mark Ruffalo' } },
+      { Actor: { name: 'Chris Hemsworth' } },
+      { Actor: { name: 'Scarlett Johansson' } }
     ],
     [
-      {ActedIn: { starring: true }},
-      {StarredIn: {}}
+      { ActedIn: { starring: true } },
+      { StarredIn: {} }
     ],
     [
-      {Film: { name: 'Avengers', year: 2012 }},
-      {Film: { name: 'Avengers: Age of Ultron', year: 2015 }},
-      {Film: { name: 'Avengers: Infinity War', year: 2018 }},
-      {Film: { name: 'Avengers: Endgame', year: 2019 }}
+      { Film: { name: 'Avengers', year: 2012 } },
+      { Film: { name: 'Avengers: Age of Ultron', year: 2015 } },
+      { Film: { name: 'Avengers: Infinity War', year: 2018 } },
+      { Film: { name: 'Avengers: Endgame', year: 2019 } }
     ]
   )
 
   // Get a single record
-  const rdj = await Actor.select({name: 'Robert Downey Jr.'}).one()
+  const rdj = await Actor.select({ name: 'Robert Downey Jr.' }).one()
 
   // Traverse the graph by reference, and retrieve many records as an array.
-  const costars = await Actor.traverse(rdj).out(ActedIn).in(StarredIn).where({name: {$ne: rdj.name}}).toArray()
+  const costars = await Actor.traverse(rdj).out(ActedIn).in(StarredIn).where({ name: { $ne: rdj.name } }).toArray()
   console.log(`${rdj.name}'s co-stars are ${costars.map(x => x.name).join(', ')}`)
   console.log('They acted in:')
 
@@ -99,7 +99,7 @@ async function main() {
   }
 
   // Delete some records
-  await Actor.delete({name: 'Jared Rushton'})
+  await Actor.delete({ name: 'Jared Rushton' })
   await Actor.delete(rdj)
 
   // Do some safe raw SQL:

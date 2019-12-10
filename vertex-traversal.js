@@ -5,28 +5,31 @@ const EdgeTraversal = require('./edge-traversal')
 
 class VertexTraversal extends Traversal {
   next() {
-      return this
+    return this
   }
   out(...edgeNames) {
-      return new VertexTraversal(this.session, this, `out(${edgeNames.map(e => `'${e.name || e}'`).join(', ')})`, true)
+    return new VertexTraversal({ parent: this, expression: `out(${edgeNames.map(e => `'${e.name || e}'`).join(', ')})`, chainable: true })
   }
   outE(...edgeNames) {
-      return new EdgeTraversal(this.session, this, `outE(${edgeNames.map(e => `'${e.name || e}'`).join(', ')})`, true)
+    return new EdgeTraversal({ parent: this, expression: `outE(${edgeNames.map(e => `'${e.name || e}'`).join(', ')})`, chainable: true })
   }
   in(...edgeNames) {
-      return new VertexTraversal(this.session, this, `in(${edgeNames.map(e => `'${e.name || e}'`).join(', ')})`, true)
+    return new VertexTraversal({ parent: this, expression: `in(${edgeNames.map(e => `'${e.name || e}'`).join(', ')})`, chainable: true })
   }
   inE(...edgeNames) {
-      return new EdgeTraversal(this.session, this, `inE(${edgeNames.map(e => `'${e.name || e}'`).join(', ')})`, true)
+    return new EdgeTraversal({ parent: this, expression: `inE(${edgeNames.map(e => `'${e.name || e}'`).join(', ')})`, chainable: true })
   }
   both(...edgeNames) {
-      return new VertexTraversal(this.session, this, `both(${edgeNames.map(e => `'${e.name || e}'`).join(', ')})`, true)
+    return new VertexTraversal({ parent: this, expression: `both(${edgeNames.map(e => `'${e.name || e}'`).join(', ')})`, chainable: true })
   }
   bothE(...edgeNames) {
-      return new EdgeTraversal(this.session, this, `bothE(${edgeNames.map(e => `'${e.name || e}'`).join(', ')})`, true)
+    return new EdgeTraversal({ parent: this, expression: `bothE(${edgeNames.map(e => `'${e.name || e}'`).join(', ')})`, chainable: true })
   }
   where(criteria) {
-      return new VertexTraversal(this.session, this, `select distinct(*) from (${this.toString()}) WHERE ${objectCriteria(criteria)}`, false)
+    return new VertexTraversal({ parent: this, expression: `select distinct(*) from (${this.toString()}) WHERE ${objectCriteria(criteria)}`, chainable: false })
+  }
+  select(fields) {
+    return new Traversal({ parent: this, expression: `select ${fields.map(escapeField).join(', ')} from (${this.toString()})`, chainable: false, terminal: true })
   }
 }
 

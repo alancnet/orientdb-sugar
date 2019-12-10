@@ -5,19 +5,22 @@ const VertexTraversal = require('./vertex-traversal')
 
 class EdgeTraversal extends Traversal {
   next() {
-      return this
+    return this
   }
   outV() {
-      return new VertexTraversal(this.session, this, `outV()`, true)
+    return new VertexTraversal({ parent: this, expression: `outV()`, chainable: true })
   }
   inV() {
-      return new VertexTraversal(this.session, this, `inV()`, true)
+    return new VertexTraversal({ parent: this, expression: `inV()`, chainable: true })
   }
   bothV() {
-      return new VertexTraversal(this.session, this, `bothV()`, true)
+    return new VertexTraversal({ parent: this, expression: `bothV()`, chainable: true })
   }
   where(criteria) {
-      return new EdgeTraversal(this.session, this, `select distinct(*) from (${this.toString()}) WHERE ${objectCriteria(criteria)}`, false)
+    return new EdgeTraversal({ parent: this, expression: `select distinct(*) from (${this.toString()}) WHERE ${objectCriteria(criteria)}`, chainable: false })
+  }
+  select(fields) {
+    return new Traversal({ parent: this, expression: `select ${fields.map(escapeField).join(', ')} from (${this.toString()})`, chainable: false, terminal: true })
   }
 }
 

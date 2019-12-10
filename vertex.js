@@ -8,16 +8,16 @@ const VertexTraversal = require('./vertex-traversal')
  */
 class Vertex extends Class {
   constructor(session, name, options) {
-      super(session, name, options)
-      this.type = 'VERTEX'
+    super(session, name, options)
+    this.type = 'VERTEX'
   }
   /**
    * Creates a new class in the schema.
    * @param {string} base Optional base class
    */
   extends(base) {
-      super.extends(base || 'V')
-      return this
+    super.extends(base || 'V')
+    return this
   }
   /**
    * Creates a new property in the schema. It requires that the class for the property already exist on the database.
@@ -25,8 +25,8 @@ class Vertex extends Class {
    * @param {string} type Defines the property data type.
    */
   property(name, type) {
-      super.property(name, type)
-      return this
+    super.property(name, type)
+    return this
   }
   /**
    * Ensures an index exists. If the index already exists, this will not overwrite or reconfigure it.
@@ -35,8 +35,8 @@ class Vertex extends Class {
    * @param {string} name Optional. Specify the name of the index.
    */
   index(properties, type, name) {
-      super.index(properties, type, name)
-      return this
+    super.index(properties, type, name)
+    return this
   }
 
   /**
@@ -45,8 +45,8 @@ class Vertex extends Class {
    * @returns {Record}
    */
   async insert(data) {
-      const s = await this.session
-      return await track(() => s.create('VERTEX', this.name).set(escapeObj(data)).one())
+    const s = await this.session
+    return await track(() => s.create('VERTEX', this.name).set(escapeObj(data)).one())
   }
   /**
    * Creates or updates a vertex. The resulting vertex would be a combination of query and data.
@@ -55,26 +55,18 @@ class Vertex extends Class {
    * @param {object} data Additional properties of the vertex.
    */
   async upsert(query, data = {}) {
-      const s = await this.session
-      let record = await track(() => s.select().from(this.name).where(escapeObj(query)).one())
-      if (record) {
-          const changed = whatChanged(record, data)
-          if (changed) {
-              await track(() => s.update(record['@rid']).set(escapeObj(changed)).one())
-              record = {...record, ...changed}
-          }
-      } else {
-          record = await track(() => s.create('VERTEX', this.name).set(escapeObj({...query, ...data})).one())
+    const s = await this.session
+    let record = await track(() => s.select().from(this.name).where(escapeObj(query)).one())
+    if (record) {
+      const changed = whatChanged(record, data)
+      if (changed) {
+        await track(() => s.update(record['@rid']).set(escapeObj(changed)).one())
+        record = { ...record, ...changed }
       }
-      return record
-  }
-
-  /**
-   * Begins traversal with query
-   * @param {object} query
-   */
-  select(query) {
-      return query ? this.traverse().where(query) : this.traverse()
+    } else {
+      record = await track(() => s.create('VERTEX', this.name).set(escapeObj({ ...query, ...data })).one())
+    }
+    return record
   }
 
   /**
@@ -82,12 +74,12 @@ class Vertex extends Class {
    * @param {Reference} reference 
    */
   traverse(record) {
-      const rids = toRidArray(record)
-      if (rids) {
-          return new VertexTraversal(this.session, null, `select distinct(*) from [${rids.join(', ')}]`, false, this.options)
-      } else {
-          return new VertexTraversal(this.session, null, `select distinct(*) from ${this.name}`, false, this.options)
-      }
+    const rids = toRidArray(record)
+    if (rids) {
+      return new VertexTraversal({ parent: null, expression: `select distinct(*) from [${rids.join(', ')}]`, chainable: false })
+    } else {
+      return new VertexTraversal({ parent: null, expression: `select distinct(*) from ${this.name}`, chainable: false })
+    }
   }
 }
 

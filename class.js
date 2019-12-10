@@ -7,19 +7,19 @@ const Traversal = require('./traversal')
  */
 class Class {
   constructor(session, name, options) {
-      this.name = name
-      this.options = options
-      if (this.options.schema[this.name]) {
-          this.session = this.options.schema[this.name].promise.then(session)
-      } else {
-          this.session = session
-      }
-      this.type = null
-      promisify(this)
+    this.name = name
+    this.options = options
+    if (this.options.schema[this.name]) {
+      this.session = this.options.schema[this.name].promise.then(session)
+    } else {
+      this.session = session
+    }
+    this.type = null
+    promisify(this)
   }
 
   log(...args) {
-      if (this.options.log) this.options.log(...args)
+    if (this.options.log) this.options.log(...args)
   }
 
   /**
@@ -27,21 +27,21 @@ class Class {
    * @param {string} base Optional base class
    */
   extends(base) {
-      if (this.options.manageSchema) {
-          if (!this.options.schema[this.name]) {
-              this.options.schema[this.name] = {
-                  promise: this.session.then(async s => {
-                      const sql = `create class ${this.name} if not exists${base ? ` extends ${base.name || base}`:''}`
-                      this.log(sql)
-                      await track(() => one(s.command(sql)))
-                      return s
-                  })
-              }
-          }
-          this._schema = this.options.schema[this.name]
-          this.session = this._schema.promise
+    if (this.options.manageSchema) {
+      if (!this.options.schema[this.name]) {
+        this.options.schema[this.name] = {
+          promise: this.session.then(async s => {
+            const sql = `create class ${this.name} if not exists${base ? ` extends ${base.name || base}` : ''}`
+            this.log(sql)
+            await track(() => one(s.command(sql)))
+            return s
+          })
+        }
       }
-      return this
+      this._schema = this.options.schema[this.name]
+      this.session = this._schema.promise
+    }
+    return this
   }
 
   /**
@@ -50,17 +50,17 @@ class Class {
    * @param {string} type Defines the property data type.
    */
   property(name, type) {
-      if (this.options.manageSchema) {
-          this.extends()
-          this._schema.promise = this._schema.promise.then(async s => {
-              const sql = `create property ${this.name}.${name} if not exists ${type}`
-              this.log(sql)
-              await track(() => s.command(sql))
-              return s
-          })
-          this.session = this._schema.promise
-      }
-      return this
+    if (this.options.manageSchema) {
+      this.extends()
+      this._schema.promise = this._schema.promise.then(async s => {
+        const sql = `create property ${this.name}.${name} if not exists ${type}`
+        this.log(sql)
+        await track(() => s.command(sql))
+        return s
+      })
+      this.session = this._schema.promise
+    }
+    return this
   }
 
   /**
@@ -70,19 +70,19 @@ class Class {
    * @param {string} name Optional. Specify the name of the index.
    */
   index(properties, type, name) {
-      if (this.options.manageSchema) {
-          if (!Array.isArray(properties)) properties = [properties]
-          this.extends()
-          const indexName = name || `${this.name}_${type.split(' ').join('_')}_${properties.join('_')}`
-          this._schema.promise = this._schema.promise.then(async s => {
-              const sql = `create index ${indexName} if not exists on ${this.name} (${properties.join(', ')}) ${type}`
-              this.log(sql)
-              await track(() => s.command(sql))
-              return s
-          })
-          this.session = this._schema.promise
-      }
-      return this
+    if (this.options.manageSchema) {
+      if (!Array.isArray(properties)) properties = [properties]
+      this.extends()
+      const indexName = name || `${this.name}_${type.split(' ').join('_')}_${properties.join('_')}`
+      this._schema.promise = this._schema.promise.then(async s => {
+        const sql = `create index ${indexName} if not exists on ${this.name} (${properties.join(', ')}) ${type}`
+        this.log(sql)
+        await track(() => s.command(sql))
+        return s
+      })
+      this.session = this._schema.promise
+    }
+    return this
   }
 
   /**
@@ -93,8 +93,8 @@ class Class {
    * @returns {Record}
    */
   async insert(record) {
-      const s = await this.session
-      return await track(() => s.insert().into(this.name).set(escapeObj(record)).one())
+    const s = await this.session
+    return await track(() => s.insert().into(this.name).set(escapeObj(record)).one())
   }
 
   /**
@@ -103,8 +103,8 @@ class Class {
    * @returns {Record}
    */
   async get(reference) {
-      const s = await this.session
-      return await track(() => s.select().from(this.name).where(escapeObj(querify(reference))).one())
+    const s = await this.session
+    return await track(() => s.select().from(this.name).where(escapeObj(querify(reference))).one())
   }
 
   /** 
@@ -113,9 +113,9 @@ class Class {
    * @param {object} data Data to update
    */
   async update(record, data) {
-      if (!data || !Object.values(data).filter(x => x !== undefined).length) throw new Error('Update requires changes')
-      const s = await this.session
-      return await track(() => s.update(record['@rid'] || record).set(escapeObj(data)).one())
+    if (!data || !Object.values(data).filter(x => x !== undefined).length) throw new Error('Update requires changes')
+    const s = await this.session
+    return await track(() => s.update(record['@rid'] || record).set(escapeObj(data)).one())
   }
 
   /**
@@ -124,18 +124,18 @@ class Class {
    * @param {object} data Additional properties of the record.
    */
   async upsert(query, data = {}) {
-      const s = await this.session
-      let record = await track(() => s.select().from(this.name).where(escapeObj(query)).one())
-      if (record) {
-          const changed = whatChanged(record, data)
-          if (changed) {
-              await track(() => s.update(record['@rid']).set(changed).one())
-              record = {...record, ...changed}
-          }
-      } else {
-          record = await track(() => s.insert().into(this.name).set(escapeObj({...query, ...data})).one())
+    const s = await this.session
+    let record = await track(() => s.select().from(this.name).where(escapeObj(query)).one())
+    if (record) {
+      const changed = whatChanged(record, data)
+      if (changed) {
+        await track(() => s.update(record['@rid']).set(changed).one())
+        record = { ...record, ...changed }
       }
-      return record
+    } else {
+      record = await track(() => s.insert().into(this.name).set(escapeObj({ ...query, ...data })).one())
+    }
+    return record
   }
 
   /**
@@ -143,16 +143,8 @@ class Class {
    * @param {(object|string|object[]|string[])} query Object query, record, record ID, array of records, or array of record IDs.
    */
   async delete(query) {
-      const s = await this.session
-      await track(() => s.delete(this.type || '').from(this.name).where(escapeObj(querify(query))).one())
-  }
-
-  /**
-   * Begins traversal with query
-   * @param {object} query
-   */
-  select(query) {
-      return query ? this.traverse().where(query) : this.traverse()
+    const s = await this.session
+    await track(() => s.delete(this.type || '').from(this.name).where(escapeObj(querify(query))).one())
   }
 
   /**
@@ -160,12 +152,12 @@ class Class {
    * @param {Reference} reference 
    */
   traverse(reference) {
-      const rids = toRidArray(reference)
-      if (rids) {
-          return new Traversal(this.session, null, `select distinct(*) from [${rids.join(', ')}]`, false, this.options)
-      } else {
-          return new Traversal(this.session, null, `select distinct(*) from ${this.name}`, false, this.options)
-      }
+    const rids = toRidArray(reference)
+    if (rids) {
+      return new Traversal({ parent: null, expression: `select distinct(*) from [${rids.join(', ')}]`, chainable: false })
+    } else {
+      return new Traversal({ parent: null, expression: `select distinct(*) from ${this.name}`, chainable: false })
+    }
   }
 }
 
