@@ -12,7 +12,7 @@ async function main() {
 
   const db = client.db('test')
 
-  const films = await db.vertex('Film').where().toArray()
+  const films = await db.vertex('Film').traverse().toArray()
   console.log(films)
 
   client.close()

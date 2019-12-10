@@ -5,7 +5,7 @@
   "main": "index.js",
   "license": "MIT",
   "scripts": {
-    "prepack": "rm -rf node_modules/orientjs/node_modules"
+    "prepublish": "rm -rf node_modules/orientjs/node_modules"
   },
   "dependencies": {
     "arrify": "^2.0.1",

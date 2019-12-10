@@ -3,26 +3,15 @@ const { iterate, objectCriteria } = require('./util')
 
 class Traversal {
   constructor(options) {
+    if (!options.session) throw new Error('Session required')
     this.options = options
     this._statement = this._statement.bind(this)
   }
   log(...args) {
     if (this.options.log) this.options.log(...args)
   }
-  toString(expr) {
-    if (expr) {
-      if (this.options.chainable) {
-        return this.options.parent.toString(`${this.options.expression}.${expr}`)
-      } else {
-        return `select distinct(*) from (select expand(${expr}) from (${this.options.expression}))`
-      }
-    } else {
-      if (this.options.chainable) {
-        return this.options.parent.toString(this.options.expression)
-      } else {
-        return this.options.expression
-      }
-    }
+  toString() {
+    return this._statement().toString()
   }
   _statement(expr) {
     if (expr) {
@@ -55,20 +44,25 @@ class Traversal {
   async one() {
     return (await this.toArray())[0]
   }
-  next() {
-    return this
+  _next(type, expression, options) {
+    return new type({
+      expression,
+      session: this.options.session,
+      parent: this,
+      ...options
+    })
   }
-  limit() {
-    return this.next()
-  }
+  /** @return {this} */
   where(criteria) {
-    return new Traversal({ parent: this, expression: nest`select distinct(*) from (${this._statement}) WHERE ${objectCriteria(criteria)}`, chainable: false })
+    return this._next(this.constructor, nest`select distinct(*) from (${this._statement}) WHERE ${objectCriteria(criteria)}`)
   }
+  /** @return {this} */
   slice(start, count) {
-    return new Traversal({ parent: this, expression: nest`${this._statement} SKIP ${start} LIMIT ${count}`, chainable: false})
+    return this._next(this.constructor, nest`${this._statement} SKIP ${start} LIMIT ${count}`)
   }
+  /** @return {this} */
   select(fields) {
-    return new Traversal({ parent: this, expression: nest`select ${fields.map(escapeField).join(', ')} from (${this._statement})`, chainable: false, terminal: true })
+    return this._next(this.constructor, nest`select ${fields.map(escapeField).join(', ')} from (${this._statement})`, { terminal: true })
   }
 }
 

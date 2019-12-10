@@ -1,3 +1,4 @@
+const nest = require('nest-literal')
 const { track, escapeObj, whatChanged, toRidArray } = require('./util')
 
 const Class = require('./class')
@@ -76,9 +77,9 @@ class Vertex extends Class {
   traverse(record) {
     const rids = toRidArray(record)
     if (rids) {
-      return new VertexTraversal({ parent: null, expression: `select distinct(*) from [${rids.join(', ')}]`, chainable: false })
+      return new VertexTraversal({ session: this.session, parent: null, expression: nest`select distinct(*) from [${rids.join(', ')}]`, chainable: false })
     } else {
-      return new VertexTraversal({ parent: null, expression: `select distinct(*) from ${this.name}`, chainable: false })
+      return new VertexTraversal({ session: this.session, parent: null, expression: nest`select distinct(*) from ${this.name}`, chainable: false })
     }
   }
 }

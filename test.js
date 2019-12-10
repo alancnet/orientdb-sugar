@@ -83,7 +83,7 @@ async function main() {
   )
 
   // Get a single record
-  const rdj = await Actor.select({ name: 'Robert Downey Jr.' }).one()
+  const rdj = await Actor.traverse().where({ name: 'Robert Downey Jr.' }).one()
 
   // Traverse the graph by reference, and retrieve many records as an array.
   const costars = await Actor.traverse(rdj).out(ActedIn).in(StarredIn).where({ name: { $ne: rdj.name } }).toArray()

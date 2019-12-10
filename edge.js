@@ -1,3 +1,4 @@
+const nest = require('nest-literal')
 const { track, escapeObj, whatChanged, toRid, toRidArray } = require('./util')
 
 const Class = require('./class')
@@ -81,9 +82,9 @@ class Edge extends Class {
   traverse(record) {
     const rids = toRidArray(record)
     if (rids) {
-      return new EdgeTraversal({ parent: null, expression: `select distinct(*) from [${rids.join(', ')}]`, chainable: false })
+      return new EdgeTraversal({ session: this.session, parent: null, expression: nest`select distinct(*) from [${rids.join(', ')}]`, chainable: false })
     } else {
-      return new EdgeTraversal({ parent: null, expression: `select distinct(*) from ${this.name}`, chainable: false })
+      return new EdgeTraversal({ session: this.session, parent: null, expression: nest`select distinct(*) from ${this.name}`, chainable: false })
     }
   }
 }

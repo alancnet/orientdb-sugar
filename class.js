@@ -33,7 +33,7 @@ class Class {
           promise: this.session.then(async s => {
             const sql = `create class ${this.name} if not exists${base ? ` extends ${base.name || base}` : ''}`
             this.log(sql)
-            await track(() => one(s.command(sql)).one())
+            await track(() => s.command(sql).one())
             return s
           })
         }
@@ -154,9 +154,9 @@ class Class {
   traverse(reference) {
     const rids = toRidArray(reference)
     if (rids) {
-      return new Traversal({ parent: null, expression: `select distinct(*) from [${rids.join(', ')}]`, chainable: false })
+      return new Traversal({ session: this.session, parent: null, expression: `select distinct(*) from [${rids.join(', ')}]`, chainable: false })
     } else {
-      return new Traversal({ parent: null, expression: `select distinct(*) from ${this.name}`, chainable: false })
+      return new Traversal({ session: this.session, parent: null, expression: `select distinct(*) from ${this.name}`, chainable: false })
     }
   }
 }
