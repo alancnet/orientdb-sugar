@@ -23,14 +23,12 @@ const EdgeTraversal = require('./edge-traversal')
 
 const create = opts => new Client(opts)
 
-module.exports = {
-  create,
-  Client,
-  Database,
-  Class,
-  Traversal,
-  Vertex,
-  Edge,
-  VertexTraversal,
-  EdgeTraversal
-}
+module.exports.create = create
+module.exports.Client = Client
+module.exports.Database = Database
+module.exports.Class = Class
+module.exports.Traversal = Traversal
+module.exports.Vertex = Vertex
+module.exports.Edge = Edge
+module.exports.VertexTraversal = VertexTraversal
+module.exports.EdgeTraversal = EdgeTraversal

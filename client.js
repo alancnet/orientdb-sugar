@@ -3,6 +3,9 @@ const _ = require('lodash')
 
 const Database = require('./database')
 
+/**
+ * Connects to a server.
+ */
 class Client {
   /**
    * 

@@ -5,6 +5,9 @@ const Class = require('./class')
 const Vertex = require('./vertex')
 const Edge = require('./edge')
 
+/**
+ * Represents a database
+ */
 class Database {
   constructor(session, options) {
     this.session = session

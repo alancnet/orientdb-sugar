@@ -1,10 +1,11 @@
 const nest = require('nest-literal')
-const { track, escapeObj, whatChanged, toRid, toRidArray } = require('./util')
+const { track, escapeObj, escapeField, whatChanged, toRid, toRidArray } = require('./util')
 
 const Class = require('./class')
 const EdgeTraversal = require('./edge-traversal')
 
 /**
+ * Represents an Edge Class in the schema
  * @implements {Promise<Edge>}
  */
 class Edge extends Class {
@@ -84,7 +85,7 @@ class Edge extends Class {
     if (rids) {
       return new EdgeTraversal({ session: this.session, parent: null, expression: nest`select distinct(*) from [${rids.join(', ')}]`, chainable: false })
     } else {
-      return new EdgeTraversal({ session: this.session, parent: null, expression: nest`select distinct(*) from ${this.name}`, chainable: false })
+      return new EdgeTraversal({ session: this.session, parent: null, expression: nest`select distinct(*) from ${escapeField(this.name)}`, chainable: false })
     }
   }
 }

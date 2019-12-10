@@ -1,10 +1,11 @@
 const nest = require('nest-literal')
-const { track, escapeObj, whatChanged, toRidArray } = require('./util')
+const { track, escapeObj, escapeField, whatChanged, toRidArray } = require('./util')
 
 const Class = require('./class')
 const VertexTraversal = require('./vertex-traversal')
 
 /**
+ * Represents a Vertex Class in the schema.
  * @implements {Promise<Vertex>}
  */
 class Vertex extends Class {
@@ -79,7 +80,7 @@ class Vertex extends Class {
     if (rids) {
       return new VertexTraversal({ session: this.session, parent: null, expression: nest`select distinct(*) from [${rids.join(', ')}]`, chainable: false })
     } else {
-      return new VertexTraversal({ session: this.session, parent: null, expression: nest`select distinct(*) from ${this.name}`, chainable: false })
+      return new VertexTraversal({ session: this.session, parent: null, expression: nest`select distinct(*) from ${escapeField(this.name)}`, chainable: false })
     }
   }
 }

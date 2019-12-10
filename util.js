@@ -3,7 +3,7 @@ require('generator-extensions')
 const gefer = require('gefer')
 const { RecordID } = require('orientjs')
 
-const escapeField = s => s.replace(/\`.*?\`|\[.*?\]|\w+/g, (m => m[0] === '[' || m[0] === '`' ? m : '`' + m + '`'))
+const escapeField = s => s.replace(/\`.*?\`|\[.*?\]|[@\w]+/g, (m => m[0] === '[' || m[0] === '`' || m[0] === '@' ? m : '`' + m + '`'))
 const escapeObj = obj => Object.fromEntries(Object.entries(obj).map(([key, value]) => [key.startsWith('`') ? key : '`' + key + '`', value]))
 const eq = require('lodash/eq')
 
