@@ -50,7 +50,7 @@ class Edge extends Class {
    */
   async insert(from, to, data = {}) {
     const s = await this.session
-    return await track(() => s.create('EDGE', this.name).from(toRid(from)).to(toRid(to)).set(escapeObj(data)).one())
+    return await track(() => s.create('EDGE', escapeField(this.name)).from(toRid(from)).to(toRid(to)).set(escapeObj(data)).one())
   }
   /**
    * Ensures an edge exists, and updates its data.
@@ -71,7 +71,7 @@ class Edge extends Class {
         record = { ...record, ...changed }
       }
     } else {
-      record = await track(() => s.create('EDGE', this.name).from(toRid(from)).to(toRid(to)).set(escapeObj(data)).one())
+      record = await track(() => s.create('EDGE', escapeField(this.name)).from(toRid(from)).to(toRid(to)).set(escapeObj(data)).one())
     }
     return record
   }

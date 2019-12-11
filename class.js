@@ -96,7 +96,7 @@ class Class {
    */
   async insert(record) {
     const s = await this.session
-    return await track(() => s.insert().into(this.name).set(escapeObj(record)).one())
+    return await track(() => s.insert().into(escapeField(this.name)).set(escapeObj(record)).one())
   }
 
   /**
@@ -106,7 +106,7 @@ class Class {
    */
   async get(reference) {
     const s = await this.session
-    return await track(() => s.select().from(this.name).where(escapeObj(querify(reference))).one())
+    return await track(() => s.select().from(escapeField(this.name)).where(escapeObj(querify(reference))).one())
   }
 
   /** 
@@ -127,7 +127,7 @@ class Class {
    */
   async upsert(query, data = {}) {
     const s = await this.session
-    let record = await track(() => s.select().from(this.name).where(escapeObj(query)).one())
+    let record = await track(() => s.select().from(escapeField(this.name)).where(escapeObj(query)).one())
     if (record) {
       const changed = whatChanged(record, data)
       if (changed) {
@@ -135,7 +135,7 @@ class Class {
         record = { ...record, ...changed }
       }
     } else {
-      record = await track(() => s.insert().into(this.name).set(escapeObj({ ...query, ...data })).one())
+      record = await track(() => s.insert().into(escapeField(this.name)).set(escapeObj({ ...query, ...data })).one())
     }
     return record
   }
@@ -146,7 +146,7 @@ class Class {
    */
   async delete(query) {
     const s = await this.session
-    await track(() => s.delete(this.type || '').from(this.name).where(escapeObj(querify(query))).one())
+    await track(() => s.delete(this.type || '').from(escapeField(this.name)).where(escapeObj(querify(query))).one())
   }
 
   /**

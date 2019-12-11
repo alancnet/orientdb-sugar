@@ -72,7 +72,6 @@ class Traversal {
         this.log(query)
         for await (let record of iterate(s.query(query))) {
           yield record
-          console.log(record)
           if (record && record['@rid']) rids.push(record['@rid'])
         }
         return rids.length ? nest`select from [${rids}]` : null

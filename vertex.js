@@ -58,7 +58,7 @@ class Vertex extends Class {
    */
   async upsert(query, data = {}) {
     const s = await this.session
-    let record = await track(() => s.select().from(this.name).where(escapeObj(query)).one())
+    let record = await track(() => s.select().from(escapeField(this.name)).where(escapeObj(query)).one())
     if (record) {
       const changed = whatChanged(record, data)
       if (changed) {
