@@ -288,9 +288,9 @@ Represents a database
     * [.learn(from, edge, to, data)](#Database+learn)
     * [.class(name, base)](#Database+class)
     * [.vertex(name, base)](#Database+vertex)
-    * [.edge(name, base)](#Database+edge) ⇒ [<code>Edge</code>](#Edge)
-    * [.v(reference)](#Database+v) ⇒ [<code>VertexTraversal</code>](#VertexTraversal)
-    * [.e(reference)](#Database+e) ⇒ [<code>EdgeTraversal</code>](#EdgeTraversal)
+    * [.edge(name, base)](#Database+edge)
+    * [.v(reference)](#Database+v)
+    * [.e(reference)](#Database+e)
 
 <a name="Database+sql"></a>
 
@@ -560,7 +560,7 @@ References a vertex class. If manageSchema is true, ensures the class exists.
 
 <a name="Database+edge"></a>
 
-### database.edge(name, base) ⇒ [<code>Edge</code>](#Edge)
+### database.edge(name, base)
 References an edge class. If manageSchema is true, ensures the class exists.
 
 **Kind**: instance method of [<code>Database</code>](#Database)  
@@ -572,7 +572,7 @@ References an edge class. If manageSchema is true, ensures the class exists.
 
 <a name="Database+v"></a>
 
-### database.v(reference) ⇒ [<code>VertexTraversal</code>](#VertexTraversal)
+### database.v(reference)
 Begins a traversal at the specified vertices
 
 **Kind**: instance method of [<code>Database</code>](#Database)  
@@ -583,7 +583,7 @@ Begins a traversal at the specified vertices
 
 <a name="Database+e"></a>
 
-### database.e(reference) ⇒ [<code>EdgeTraversal</code>](#EdgeTraversal)
+### database.e(reference)
 Begins a traversal at the specified edges
 
 **Kind**: instance method of [<code>Database</code>](#Database)  

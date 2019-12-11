@@ -33,7 +33,7 @@ class Class {
       if (!this.options.schema[this.name]) {
         this.options.schema[this.name] = {
           promise: this.session.then(async s => {
-            const sql = `create class ${this.name} if not exists${base ? ` extends ${base.name || base}` : ''}`
+            const sql = `create class ${escapeField(this.name)} if not exists${base ? ` extends ${escapeField(base.name || base)}` : ''}`
             this.log(sql)
             await track(() => s.command(sql).one())
             return s
@@ -55,7 +55,7 @@ class Class {
     if (this.options.manageSchema) {
       this.extends()
       this._schema.promise = this._schema.promise.then(async s => {
-        const sql = `create property ${this.name}.${name} if not exists ${type}`
+        const sql = `create property ${escapeField(this.name)}.${escapeField(name)} if not exists ${type}`
         this.log(sql)
         await track(() => s.command(sql).one())
         return s
@@ -77,7 +77,7 @@ class Class {
       this.extends()
       const indexName = name || `${this.name}_${type.split(' ').join('_')}_${properties.join('_')}`
       this._schema.promise = this._schema.promise.then(async s => {
-        const sql = `create index ${indexName} if not exists on ${this.name} (${properties.join(', ')}) ${type}`
+        const sql = `create index ${escapeField(indexName)} if not exists on ${escapeField(this.name)} (${properties.map(escapeField).join(', ')}) ${type}`
         this.log(sql)
         await track(() => s.command(sql).one())
         return s

@@ -1,7 +1,7 @@
 {
   "name": "orientdb-sugar",
   "description": "Syntactic sugar for OrientDB using orientjs.",
-  "version": "0.1.26",
+  "version": "0.1.28",
   "main": "index.js",
   "license": "MIT",
   "scripts": {

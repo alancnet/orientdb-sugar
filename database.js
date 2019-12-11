@@ -285,7 +285,6 @@ class Database {
    * References an edge class. If manageSchema is true, ensures the class exists.
    * @param {string} name 
    * @param {(Edge|string)} base Base edge class
-   * @returns {Edge}
    */
   edge(name, base) {
     return new Edge(this.session, name, this.options).extends(base)
@@ -293,7 +292,6 @@ class Database {
   /**
    * Begins a traversal at the specified vertices
    * @param {Reference} reference 
-   * @return {VertexTraversal}
    */
   v(reference) {
     return new Vertex(this.session, 'V', this.options).traverse(reference)
@@ -301,7 +299,6 @@ class Database {
   /**
    * Begins a traversal at the specified edges
    * @param {Reference} reference
-   * @returns {EdgeTraversal}
    */
   e(reference) {
     return new Edge(this.session, 'E', this.options).traverse(reference)
